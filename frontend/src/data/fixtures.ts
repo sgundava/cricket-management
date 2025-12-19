@@ -13,6 +13,7 @@ const generatePitch = (venue: string): PitchConditions => {
     'Punjab Cricket Association Stadium': { pace: 75, spin: 40, bounce: 80, deterioration: 20 },
     'Narendra Modi Stadium': { pace: 60, spin: 55, bounce: 65, deterioration: 30 },
     'Rajiv Gandhi International Stadium': { pace: 65, spin: 55, bounce: 70, deterioration: 35 },
+    'BRSABV Ekana Cricket Stadium': { pace: 55, spin: 65, bounce: 60, deterioration: 40 },
   };
 
   const base = pitchProfiles[venue] || { pace: 60, spin: 55, bounce: 65, deterioration: 30 };
@@ -27,7 +28,7 @@ const generatePitch = (venue: string): PitchConditions => {
 };
 
 // All team IDs
-const allTeamIds = ['mi', 'csk', 'rcb', 'kkr', 'dc', 'rr', 'pk', 'gt', 'srh'];
+const allTeamIds = ['mi', 'csk', 'rcb', 'kkr', 'dc', 'rr', 'pk', 'gt', 'srh', 'lsg'];
 
 // Venues by team
 const venues: Record<string, string> = {
@@ -40,24 +41,25 @@ const venues: Record<string, string> = {
   pk: 'Punjab Cricket Association Stadium',
   gt: 'Narendra Modi Stadium',
   srh: 'Rajiv Gandhi International Stadium',
+  lsg: 'BRSABV Ekana Cricket Stadium',
 };
 
 // Generate fixtures for full IPL season (14 matches per team)
-// Each team plays 8 teams once = 8 matches, then 6 teams again = 14 total
+// With 10 teams: play 9 opponents once = 9 matches, then 5 opponents again = 14 total
 export const generateFixtures = (playerTeamId: string): Match[] => {
   const otherTeams = allTeamIds.filter(id => id !== playerTeamId);
 
   // Shuffle opponents
   const shuffled = [...otherTeams].sort(() => Math.random() - 0.5);
 
-  // First 8 matches: play each opponent once
+  // First 9 matches: play each opponent once
   const firstRound: { opponent: string; isHome: boolean }[] = shuffled.map((opponent, i) => ({
     opponent,
     isHome: i % 2 === 0, // Alternate home/away
   }));
 
-  // Next 6 matches: play 6 teams again (reverse home/away)
-  const secondRound = shuffled.slice(0, 6).map((opponent, i) => ({
+  // Next 5 matches: play 5 teams again (reverse home/away)
+  const secondRound = shuffled.slice(0, 5).map((opponent) => ({
     opponent,
     isHome: !firstRound.find(m => m.opponent === opponent)?.isHome, // Flip home/away
   }));

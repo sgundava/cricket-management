@@ -9,6 +9,7 @@ import {
   punjabPlayers,
   gujaratPlayers,
   hyderabadPlayers,
+  lucknowPlayers,
 } from './players';
 
 export const teams: Team[] = [
@@ -172,6 +173,24 @@ export const teams: Team[] = [
     reputation: 80,
     fanBase: 80,
     boardPatience: 68,
+    boardExpectations: 'compete',
+  },
+  {
+    id: 'lsg',
+    name: 'Lucknow Super Giants',
+    shortName: 'LSG',
+    colors: { primary: '#A72056', secondary: '#FFCC00' },
+    homeCity: 'Lucknow',
+    homeVenue: 'BRSABV Ekana Cricket Stadium',
+    budget: 10.5,
+    salaryCap: 120,
+    currentSalary: 71.8,
+    squad: lucknowPlayers.map((p) => p.id),
+    captain: 'rishabh-pant',
+    viceCaptain: 'nicholas-pooran',
+    reputation: 75,
+    fanBase: 70,
+    boardPatience: 72,
     boardExpectations: 'compete',
   },
 ];
