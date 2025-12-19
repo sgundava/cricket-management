@@ -26,3 +26,7 @@ npm-debug.log*
 # Cache
 .cache/
 .eslintcache
+
+# Internal docs
+CHANGELOG.md
+DESIGN.md
