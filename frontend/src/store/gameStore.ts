@@ -402,8 +402,9 @@ export const useGameStore = create<GameStore>()(
         // Get all teams except player's team
         const aiTeams = teams.filter((t) => t.id !== playerTeamId);
 
-        // Randomly simulate 2-3 matches
-        const numMatches = 2 + Math.floor(Math.random() * 2); // 2-3 matches
+        // Simulate 4 AI matches per player match to ensure all teams play 14 games
+        // Math: 70 total matches needed, 14 player matches, so 56 AI matches / 14 = 4 per round
+        const numMatches = 4;
         const newPointsTable = [...pointsTable];
         const simulatedResults: { winner: string; loser: string; margin: string }[] = [];
 
@@ -415,10 +416,16 @@ export const useGameStore = create<GameStore>()(
           const availableTeams = aiTeams.filter((t) => !teamsPlayedThisRound.has(t.id));
           if (availableTeams.length < 2) break;
 
-          // Pick two random teams
-          const shuffled = availableTeams.sort(() => Math.random() - 0.5);
-          const team1 = shuffled[0];
-          const team2 = shuffled[1];
+          // Sort by games played (ascending) to balance schedule - teams with fewer games get priority
+          const sorted = availableTeams.sort((a, b) => {
+            const aPlayed = newPointsTable.find(e => e.teamId === a.id)?.played ?? 0;
+            const bPlayed = newPointsTable.find(e => e.teamId === b.id)?.played ?? 0;
+            // Primary: fewer games first, Secondary: random tiebreaker
+            if (aPlayed !== bPlayed) return aPlayed - bPlayed;
+            return Math.random() - 0.5;
+          });
+          const team1 = sorted[0];
+          const team2 = sorted[1];
 
           teamsPlayedThisRound.add(team1.id);
           teamsPlayedThisRound.add(team2.id);

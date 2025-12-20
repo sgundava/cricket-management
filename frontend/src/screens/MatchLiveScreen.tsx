@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useGameStore } from '../store/gameStore';
-import { simulateOver, simulateSingleBall, generateDefaultTactics } from '../engine/matchEngine';
+import { simulateOver, simulateSingleBall, generateDefaultTactics, selectSmartBowler } from '../engine/matchEngine';
 import { InningsState, OverSummary, Player, MatchTactics, BallEvent, SerializedInningsState, BowlingLength, FieldSetting } from '../types';
 
 // Bowling length options for live override
@@ -247,17 +247,13 @@ export const MatchLiveScreen = () => {
       setSelectedNextBowler(null); // Reset selection after use
     }
 
-    // Fallback to automatic selection (respecting limits)
+    // Fallback to smart automatic selection
     if (!bowler) {
-      const availableBowlers = bowlers.filter((b) => {
-        const overs = getBowlerOvers(b.id);
-        return b.id !== lastBowlerId && overs < MAX_OVERS_PER_BOWLER;
-      });
+      // Use smart bowler selection based on match context
+      bowler = selectSmartBowler(bowlers, inningsState, lastBowlerId, MAX_OVERS_PER_BOWLER);
 
-      if (availableBowlers.length > 0) {
-        bowler = availableBowlers[Math.floor(Math.random() * availableBowlers.length)];
-      } else {
-        // Edge case: only last bowler hasn't maxed out
+      // Final fallback if smart selection fails
+      if (!bowler) {
         const stillAvailable = bowlers.filter(b => getBowlerOvers(b.id) < MAX_OVERS_PER_BOWLER);
         bowler = stillAvailable[0] || bowlers[0];
       }
@@ -569,14 +565,11 @@ export const MatchLiveScreen = () => {
       }
 
       if (!bowler) {
-        const availableBowlers = bowlers.filter((b) => {
-          const overs = getBowlerOvers(b.id);
-          return b.id !== lastBowlerId && overs < MAX_OVERS_PER_BOWLER;
-        });
+        // Use smart bowler selection based on match context
+        bowler = selectSmartBowler(bowlers, inningsState, lastBowlerId, MAX_OVERS_PER_BOWLER);
 
-        if (availableBowlers.length > 0) {
-          bowler = availableBowlers[Math.floor(Math.random() * availableBowlers.length)];
-        } else {
+        // Final fallback if smart selection fails
+        if (!bowler) {
           const stillAvailable = bowlers.filter(b => getBowlerOvers(b.id) < MAX_OVERS_PER_BOWLER);
           bowler = stillAvailable[0] || bowlers[0];
         }

@@ -979,6 +979,27 @@ export const chennaiPlayers: Player[] = [
 // ============================================
 export const bangalorePlayers: Player[] = [
   createPlayer({
+    id: 'rcb-kohli',
+    name: 'Virat Kohli',
+    shortName: 'Kohli',
+    age: 36,
+    role: 'batsman',
+    playingRole: 'top-order-batter',
+    imageUrl: 'https://img1.hscicdn.com/lsci/db/PICTURES/CMS/323000/323047.png',
+    battingStyle: 'right',
+    bowlingStyle: 'right-arm-medium',
+    batting: { technique: 92, power: 85, timing: 94, temperament: 90 },
+    bowling: { speed: 35, accuracy: 40, variation: 30, stamina: 35 },
+    fielding: { catching: 82, ground: 85, throwing: 80, athleticism: 78 },
+    potential: { batting: 95, bowling: 40, fielding: 85 },
+    form: 8,
+    fitness: 90,
+    morale: 85,
+    fatigue: 10,
+    personality: { temperament: 'fiery', professionalism: 95, ambition: 98, leadership: 92 },
+    contract: { salary: 2100, yearsRemaining: 3, releaseClause: null, isOverseas: false },
+  }),
+  createPlayer({
     id: 'vihaan-malhotra',
     name: 'Vihaan Malhotra',
     shortName: 'Malhotra',

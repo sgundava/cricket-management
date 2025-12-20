@@ -25,31 +25,32 @@ const BALLS_PER_OVER = 6;
 const MAX_OVERS_PER_BOWLER = 4; // T20 rule: overs / 5 = max per bowler
 
 // Base outcome probabilities (will be modified by skills, form, etc.)
+// Wicket at 5% = ~6 wickets per innings (realistic T20)
 const BASE_OUTCOMES = {
-  dot: 0.35,
-  single: 0.28,
+  dot: 0.36,
+  single: 0.30,
   two: 0.08,
   three: 0.02,
   four: 0.12,
   six: 0.06,
-  wicket: 0.09,
+  wicket: 0.05,
 };
 
-// Phase modifiers
+// Phase modifiers - subtle wicket differences
 const PHASE_MODIFIERS: Record<MatchPhase, { boundaryMod: number; wicketMod: number; runRate: number }> = {
-  powerplay: { boundaryMod: 1.2, wicketMod: 1.1, runRate: 8.5 },
-  middle: { boundaryMod: 0.9, wicketMod: 0.85, runRate: 7.5 },
-  death: { boundaryMod: 1.4, wicketMod: 1.25, runRate: 11 },
+  powerplay: { boundaryMod: 1.2, wicketMod: 1.05, runRate: 8.5 },
+  middle: { boundaryMod: 0.9, wicketMod: 0.95, runRate: 7.5 },
+  death: { boundaryMod: 1.4, wicketMod: 1.1, runRate: 11 },
 };
 
-// Tactical approach modifiers
+// Tactical approach modifiers - less extreme wicket effects
 const TACTICAL_MODIFIERS: Record<TacticalApproach, { boundaryMod: number; wicketMod: number }> = {
-  aggressive: { boundaryMod: 1.25, wicketMod: 1.3 },
+  aggressive: { boundaryMod: 1.25, wicketMod: 1.1 },
   balanced: { boundaryMod: 1.0, wicketMod: 1.0 },
-  cautious: { boundaryMod: 0.75, wicketMod: 0.7 },
+  cautious: { boundaryMod: 0.75, wicketMod: 0.9 },
 };
 
-// Bowling length modifiers
+// Bowling length modifiers - reduced wicket effects
 const BOWLING_LENGTH_MODIFIERS: Record<BowlingLength, {
   boundaryMod: number;
   wicketMod: number;
@@ -62,43 +63,43 @@ const BOWLING_LENGTH_MODIFIERS: Record<BowlingLength, {
     wicketMod: 1.0,
     dotMod: 1.0,
     skillType: 'accuracy',
-    minSkill: 0, // Always works
+    minSkill: 0,
   },
   'short': {
-    boundaryMod: 1.3,   // More pull shots = more boundaries
-    wicketMod: 1.25,    // Top edge catches
+    boundaryMod: 1.3,
+    wicketMod: 1.08,    // Slight increase (top edge catches)
     dotMod: 0.85,
     skillType: 'speed',
-    minSkill: 65,       // Needs pace to be effective
+    minSkill: 65,
   },
   'yorkers': {
-    boundaryMod: 0.7,   // Hard to hit for boundaries
-    wicketMod: 1.15,    // LBW, bowled risk
-    dotMod: 1.3,        // Lots of dots
+    boundaryMod: 0.7,
+    wicketMod: 1.05,    // Slight increase (LBW, bowled)
+    dotMod: 1.3,
     skillType: 'accuracy',
-    minSkill: 70,       // Needs accuracy to land yorkers
+    minSkill: 70,
   },
   'full-pitched': {
-    boundaryMod: 1.15,  // Driving opportunities
-    wicketMod: 1.35,    // Early swing wickets
+    boundaryMod: 1.15,
+    wicketMod: 1.1,     // Reduced from 1.35
     dotMod: 0.95,
     skillType: 'accuracy',
     minSkill: 50,
   },
 };
 
-// Field setting modifiers
+// Field setting modifiers - reduced wicket effects
 const FIELD_SETTING_MODIFIERS: Record<FieldSetting, {
   boundaryMod: number;
   wicketMod: number;
-  catchMod: number;     // Affects catch dismissal probability
-  runOutMod: number;    // Affects run-out chances
+  catchMod: number;
+  runOutMod: number;
 }> = {
   'attacking': {
-    boundaryMod: 1.25,      // Gaps in boundary
-    wicketMod: 1.35,        // More close catchers
-    catchMod: 1.3,          // Better catching positions
-    runOutMod: 0.9,         // Less ground coverage
+    boundaryMod: 1.25,
+    wicketMod: 1.1,         // Reduced from 1.35
+    catchMod: 1.15,
+    runOutMod: 0.9,
   },
   'balanced': {
     boundaryMod: 1.0,
@@ -107,30 +108,165 @@ const FIELD_SETTING_MODIFIERS: Record<FieldSetting, {
     runOutMod: 1.0,
   },
   'defensive': {
-    boundaryMod: 0.7,       // Boundary riders save 4s
-    wicketMod: 0.8,         // Fewer catching positions
-    catchMod: 0.75,
-    runOutMod: 1.15,        // More ground cover = more pressure
+    boundaryMod: 0.7,
+    wicketMod: 0.9,         // Less reduction
+    catchMod: 0.85,
+    runOutMod: 1.1,
   },
   'death-field': {
-    boundaryMod: 0.6,       // Long boundaries covered
-    wicketMod: 0.9,
-    catchMod: 1.1,          // Deep catches possible
-    runOutMod: 1.2,         // Boundary sweepers create pressure
+    boundaryMod: 0.6,
+    wicketMod: 0.95,
+    catchMod: 1.05,
+    runOutMod: 1.15,
   },
 };
 
 // Fielding skill baseline (60 is considered average)
 const FIELDING_BASELINE = 60;
 
+// Batsman state based on balls faced (settling-in period)
+type BatsmanState = 'new' | 'settling' | 'set';
+
+const BATSMAN_STATE_THRESHOLDS = {
+  new: 6,       // First 6 balls - survival mode
+  settling: 15, // Balls 7-15 - gradually opening up
+};
+
+// Batsman state modifiers - affects scoring style, NOT wicket probability
+// A cautious batsman plays safer shots = fewer boundaries, but NOT more wickets
+const BATSMAN_STATE_MODIFIERS: Record<BatsmanState, {
+  boundaryMod: number;    // Reduced boundaries when new
+  wicketMod: number;      // NO penalty - playing safe means safer shots
+  dotMod: number;         // More dots when new
+  singleMod: number;      // More rotation when settling
+}> = {
+  'new': {
+    boundaryMod: 0.75,    // 25% fewer boundaries - getting eye in
+    wicketMod: 1.0,       // No wicket penalty - playing carefully
+    dotMod: 1.1,          // 10% more dot balls
+    singleMod: 1.0,
+  },
+  'settling': {
+    boundaryMod: 0.9,     // 10% fewer boundaries
+    wicketMod: 1.0,       // No wicket penalty
+    dotMod: 1.05,         // 5% more dots
+    singleMod: 1.0,
+  },
+  'set': {
+    boundaryMod: 1.0,     // Full attacking mode
+    wicketMod: 1.0,       // Normal risk
+    dotMod: 1.0,
+    singleMod: 1.0,
+  },
+};
+
+// Pressure and momentum system
+interface MatchContext {
+  recentWickets: number;      // Wickets in last 3 overs
+  bowlerWickets: number;      // Wickets by current bowler this innings
+  recentRunRate: number;      // Run rate in last 3 overs
+  partnershipRuns: number;    // Current partnership runs
+}
+
+// Pressure modifiers based on match context
+// Very subtle effects - cricket is unpredictable, don't over-engineer
+const getPressureModifiers = (context: MatchContext): {
+  boundaryMod: number;
+  wicketMod: number;
+  dotMod: number;
+} => {
+  let boundaryMod = 1.0;
+  let wicketMod = 1.0;
+  let dotMod = 1.0;
+
+  // Recent wickets - batters consolidate (fewer boundaries, NOT more wickets)
+  if (context.recentWickets >= 3) {
+    boundaryMod *= 0.9;
+    dotMod *= 1.05;
+    // No wicket modifier - consolidation means safer play
+  } else if (context.recentWickets >= 2) {
+    boundaryMod *= 0.95;
+  }
+
+  // Bowler on a roll - batters respect them (fewer boundaries)
+  if (context.bowlerWickets >= 3) {
+    boundaryMod *= 0.92;
+  } else if (context.bowlerWickets >= 2) {
+    boundaryMod *= 0.96;
+  }
+
+  // Momentum from recent scoring - confidence boost
+  if (context.recentRunRate >= 10) {
+    boundaryMod *= 1.1;
+    wicketMod *= 0.95;  // Confidence = better shot selection
+  } else if (context.recentRunRate >= 8) {
+    boundaryMod *= 1.05;
+    wicketMod *= 0.98;
+  }
+
+  // Established partnership builds confidence
+  if (context.partnershipRuns >= 50) {
+    boundaryMod *= 1.08;
+    wicketMod *= 0.92;  // Set batters less likely to make mistakes
+  } else if (context.partnershipRuns >= 30) {
+    boundaryMod *= 1.04;
+    wicketMod *= 0.96;
+  }
+
+  return { boundaryMod, wicketMod, dotMod };
+};
+
 // ============================================
 // HELPER FUNCTIONS
 // ============================================
+
+const getBatsmanState = (ballsFaced: number): BatsmanState => {
+  if (ballsFaced < BATSMAN_STATE_THRESHOLDS.new) return 'new';
+  if (ballsFaced < BATSMAN_STATE_THRESHOLDS.settling) return 'settling';
+  return 'set';
+};
 
 const getPhase = (over: number): MatchPhase => {
   if (over < 6) return 'powerplay';
   if (over < 16) return 'middle';
   return 'death';
+};
+
+// Calculate match context from innings state
+const calculateMatchContext = (
+  inningsState: InningsState,
+  currentBowlerId: string
+): MatchContext => {
+  const currentOver = inningsState.overs;
+
+  // Count wickets in last 3 overs
+  const recentWickets = inningsState.fallOfWickets.filter(
+    fow => fow.overs >= currentOver - 3
+  ).length;
+
+  // Get bowler's wickets this innings
+  const bowlerStats = inningsState.bowlerStats.get(currentBowlerId);
+  const bowlerWickets = bowlerStats?.wickets ?? 0;
+
+  // Calculate recent run rate from over summaries (last 3 overs)
+  const recentOvers = inningsState.overSummaries.slice(-3);
+  const recentRuns = recentOvers.reduce((sum, os) => sum + os.runs, 0);
+  const recentOversCount = recentOvers.length || 1;
+  const recentRunRate = (recentRuns / recentOversCount) * 6 / 6; // Convert to per-over rate
+
+  // Calculate current partnership runs
+  // Partnership is runs since last wicket
+  const lastWicket = inningsState.fallOfWickets[inningsState.fallOfWickets.length - 1];
+  const partnershipRuns = lastWicket
+    ? inningsState.runs - lastWicket.runs
+    : inningsState.runs; // If no wicket yet, partnership is total runs
+
+  return {
+    recentWickets,
+    bowlerWickets,
+    recentRunRate,
+    partnershipRuns,
+  };
 };
 
 const getOverallBattingSkill = (player: Player): number => {
@@ -398,7 +534,11 @@ export const simulateBall = (
   pitch: PitchConditions,
   // New optional parameters for bowling tactics and fielding
   bowlingTactics?: { length: BowlingLength; field: FieldSetting },
-  teamFielding?: { catching: number; athleticism: number; throwing: number; ground: number }
+  teamFielding?: { catching: number; athleticism: number; throwing: number; ground: number },
+  // Batsman settling-in: balls faced by this batter
+  ballsFaced: number = 0,
+  // Pressure/momentum context
+  matchContext?: MatchContext
 ): { outcome: BallOutcome; narrative: string } => {
   const phase = getPhase(over);
   const phaseMod = PHASE_MODIFIERS[phase];
@@ -432,27 +572,45 @@ export const simulateBall = (
   const batterFatigue = applyFatigueModifier(1, batter.fatigue);
   const bowlerFatigue = applyFatigueModifier(1, bowler.fatigue);
 
+  // Batsman settling-in state
+  const batsmanState = getBatsmanState(ballsFaced);
+  const batsmanStateMod = BATSMAN_STATE_MODIFIERS[batsmanState];
+
   // Calculate modified probabilities
   let probs = { ...BASE_OUTCOMES };
 
   // Skill affects all outcomes
   const skillModifier = 1 + skillDiff * 0.15;
 
-  // Apply all modifiers to boundaries (batting approach, phase, bowling length, field setting)
+  // Apply all modifiers to boundaries (batting approach, phase, bowling length, field setting, batsman state)
   const boundaryMod = phaseMod.boundaryMod * tacticsMod.boundaryMod *
-    bowlingLengthMod.boundaryMod * fieldSettingMod.boundaryMod * lengthEffectiveness;
+    bowlingLengthMod.boundaryMod * fieldSettingMod.boundaryMod * lengthEffectiveness *
+    batsmanStateMod.boundaryMod;
 
   probs.four *= skillModifier * batterForm * batterFatigue * boundaryMod;
   probs.six *= skillModifier * batterForm * batterFatigue * boundaryMod;
 
-  // Apply all modifiers to wickets
+  // Apply all modifiers to wickets (including batsman state)
   const wicketMod = phaseMod.wicketMod * tacticsMod.wicketMod *
-    bowlingLengthMod.wicketMod * fieldSettingMod.wicketMod * lengthEffectiveness;
+    bowlingLengthMod.wicketMod * fieldSettingMod.wicketMod * lengthEffectiveness *
+    batsmanStateMod.wicketMod;
 
   probs.wicket *= (1 / skillModifier) * bowlerForm * bowlerFatigue * wicketMod;
 
-  // Apply dot ball modifier from bowling length
-  probs.dot *= bowlingLengthMod.dotMod * lengthEffectiveness;
+  // Apply dot ball modifier from bowling length and batsman state
+  probs.dot *= bowlingLengthMod.dotMod * lengthEffectiveness * batsmanStateMod.dotMod;
+
+  // Apply single modifier from batsman state
+  probs.single *= batsmanStateMod.singleMod;
+
+  // Apply pressure/momentum modifiers
+  if (matchContext) {
+    const pressureMod = getPressureModifiers(matchContext);
+    probs.four *= pressureMod.boundaryMod;
+    probs.six *= pressureMod.boundaryMod;
+    probs.wicket *= pressureMod.wicketMod;
+    probs.dot *= pressureMod.dotMod;
+  }
 
   // Pitch effects
   if (bowler.bowlingStyle?.includes('spin')) {
@@ -558,6 +716,13 @@ export const simulateSingleBall = (
     };
   }
 
+  // Get striker's balls faced for settling-in calculation
+  const strikerStats = inningsState.batterStats.get(striker.id);
+  const strikerBallsFaced = strikerStats?.balls ?? 0;
+
+  // Calculate match context for pressure/momentum
+  const matchContext = calculateMatchContext(inningsState, bowler.id);
+
   const { outcome, narrative } = simulateBall(
     striker,
     bowler,
@@ -566,7 +731,11 @@ export const simulateSingleBall = (
     target,
     inningsState.runs,
     tactics,
-    pitch
+    pitch,
+    undefined, // bowlingTactics
+    undefined, // teamFielding
+    strikerBallsFaced,
+    matchContext
   );
 
   // Create ball event
@@ -727,6 +896,12 @@ export const simulateOver = (
     (p) => !inningsState.fallOfWickets.some((f) => f.player === p.id)
   );
 
+  // Track balls faced during this over (added to existing stats)
+  const overBallsFaced: Map<string, number> = new Map();
+
+  // Calculate initial match context (will be updated as wickets fall)
+  let matchContext = calculateMatchContext(inningsState, bowler.id);
+
   let ballNumber = 0;
   while (ballNumber < BALLS_PER_OVER) {
     const striker = battingTeam.find((p) => p.id === currentBatters[strikerIndex])!;
@@ -736,6 +911,18 @@ export const simulateOver = (
       break;
     }
 
+    // Get striker's total balls faced (existing + this over)
+    const existingBalls = inningsState.batterStats.get(striker.id)?.balls ?? 0;
+    const overBalls = overBallsFaced.get(striker.id) ?? 0;
+    const strikerBallsFaced = existingBalls + overBalls;
+
+    // Update match context with current over's wickets
+    const updatedContext: MatchContext = {
+      ...matchContext,
+      recentWickets: matchContext.recentWickets + wickets,
+      partnershipRuns: matchContext.partnershipRuns + runs,
+    };
+
     const { outcome, narrative } = simulateBall(
       striker,
       bowler,
@@ -744,8 +931,17 @@ export const simulateOver = (
       target,
       inningsState.runs + runs,
       tactics,
-      pitch
+      pitch,
+      undefined, // bowlingTactics
+      undefined, // teamFielding
+      strikerBallsFaced,
+      updatedContext
     );
+
+    // Update balls faced for this striker during the over
+    if (outcome.type !== 'extra' || (outcome.extraType !== 'wide' && outcome.extraType !== 'noball')) {
+      overBallsFaced.set(striker.id, (overBallsFaced.get(striker.id) ?? 0) + 1);
+    }
 
     // Record ball event
     balls.push({
@@ -761,6 +957,13 @@ export const simulateOver = (
     if (outcome.type === 'wicket') {
       wickets++;
       runs += outcome.runs;
+
+      // Reset partnership runs in match context after wicket
+      matchContext = {
+        ...matchContext,
+        partnershipRuns: 0,
+        recentWickets: matchContext.recentWickets + 1,
+      };
 
       // Get next batter
       const nextBatter = availableBatters.find(
@@ -1118,6 +1321,128 @@ export const generateDefaultTactics = (teamPlayers: Player[], captain: string): 
     },
     playerInstructions: [],
   };
+};
+
+// ============================================
+// SMART BOWLER SELECTION
+// ============================================
+
+export type BowlerRole = 'powerplay' | 'middle' | 'death' | 'partnership-breaker';
+
+interface BowlerAnalysis {
+  bowler: Player;
+  role: BowlerRole;
+  score: number;        // Selection priority score
+  overs: number;        // Overs bowled
+  economy: number;      // Economy rate
+  wickets: number;      // Wickets taken
+  isHot: boolean;       // Taking wickets this innings
+}
+
+// Determine bowler's ideal role based on attributes
+const getBowlerRole = (bowler: Player): BowlerRole => {
+  const isPace = bowler.bowlingStyle?.includes('fast') || bowler.bowlingStyle?.includes('medium');
+  const isSpin = bowler.bowlingStyle?.includes('spin') || bowler.bowlingStyle?.includes('leg');
+  const accuracy = bowler.bowling.accuracy;
+  const variation = bowler.bowling.variation;
+
+  // Death specialists need accuracy (for yorkers)
+  if (isPace && accuracy >= 70) return 'death';
+
+  // Powerplay bowlers need pace and variation
+  if (isPace && bowler.bowling.speed >= 70) return 'powerplay';
+
+  // Spinners typically bowl in middle overs
+  if (isSpin) return 'middle';
+
+  // Default to middle overs
+  return 'middle';
+};
+
+// Select the best bowler based on match context
+export const selectSmartBowler = (
+  availableBowlers: Player[],
+  inningsState: InningsState,
+  lastBowlerId: string | null | undefined,
+  maxOvers: number = 4
+): Player | null => {
+  const currentOver = inningsState.overs;
+  const phase = getPhase(currentOver);
+
+  // Filter out last bowler and those who've bowled max overs
+  const eligibleBowlers = availableBowlers.filter(b => {
+    if (b.id === lastBowlerId) return false;
+    const overs = inningsState.bowlerStats.get(b.id)?.overs ?? 0;
+    return overs < maxOvers;
+  });
+
+  if (eligibleBowlers.length === 0) {
+    // Fallback: anyone who hasn't maxed out
+    const stillAvailable = availableBowlers.filter(b => {
+      const overs = inningsState.bowlerStats.get(b.id)?.overs ?? 0;
+      return overs < maxOvers;
+    });
+    return stillAvailable[0] || null;
+  }
+
+  // Analyze each bowler
+  const analyses: BowlerAnalysis[] = eligibleBowlers.map(bowler => {
+    const stats = inningsState.bowlerStats.get(bowler.id);
+    const overs = stats?.overs ?? 0;
+    const runs = stats?.runs ?? 0;
+    const wickets = stats?.wickets ?? 0;
+    const economy = overs > 0 ? (runs / overs) : 0;
+    const role = getBowlerRole(bowler);
+    const isHot = wickets >= 2; // On a roll
+
+    // Calculate selection score
+    let score = 50; // Base score
+
+    // Phase matching bonus
+    if (phase === 'powerplay' && role === 'powerplay') score += 20;
+    if (phase === 'middle' && role === 'middle') score += 20;
+    if (phase === 'death' && role === 'death') score += 25;
+
+    // Hot bowler bonus (partnership breaker)
+    if (isHot) {
+      score += 30; // Bring back the wicket-taker
+    }
+
+    // Economy penalty/bonus (if has bowled)
+    if (overs >= 1) {
+      if (economy < 6) score += 15;
+      else if (economy < 8) score += 5;
+      else if (economy > 10) score -= 10;
+      else if (economy > 12) score -= 20;
+    }
+
+    // Wickets in this innings bonus
+    score += wickets * 8;
+
+    // Fresh bowler slight bonus (variety)
+    if (overs === 0) score += 5;
+
+    // Overs remaining consideration (spread workload)
+    const oversRemaining = maxOvers - overs;
+    if (oversRemaining <= 1 && phase !== 'death') {
+      score -= 10; // Save last over for death if possible
+    }
+
+    // Skill-based adjustment
+    const bowlerSkill = getOverallBowlingSkill(bowler);
+    score += (bowlerSkill - 55) * 0.3; // Skill bonus
+
+    // Form adjustment
+    score += bowler.form * 0.5;
+
+    return { bowler, role, score, overs, economy, wickets, isHot };
+  });
+
+  // Sort by score (highest first)
+  analyses.sort((a, b) => b.score - a.score);
+
+  // Return the best bowler
+  return analyses[0]?.bowler || null;
 };
 
 // Export helper for use in live match UI
