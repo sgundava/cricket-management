@@ -44,39 +44,82 @@ const venues: Record<string, string> = {
   lsg: 'BRSABV Ekana Cricket Stadium',
 };
 
-// Generate fixtures for full IPL season (14 matches per team)
-// With 10 teams: play 9 opponents once = 9 matches, then 5 opponents again = 14 total
+// Generate fixtures for full IPL season (14 matches per team, 70 total matches)
+// With 10 teams: each team plays 9 opponents once = 45 matches, then 5 rematches each = 25 more = 70 total
 export const generateFixtures = (playerTeamId: string): Match[] => {
-  const otherTeams = allTeamIds.filter(id => id !== playerTeamId);
+  const fixtures: Match[] = [];
 
-  // Shuffle opponents
-  const shuffled = [...otherTeams].sort(() => Math.random() - 0.5);
+  // Step 1: Generate round-robin (each team plays every other team once) = 45 matches
+  const roundRobinMatches: { home: string; away: string }[] = [];
+  for (let i = 0; i < allTeamIds.length; i++) {
+    for (let j = i + 1; j < allTeamIds.length; j++) {
+      // Randomly decide home/away
+      const isFirstHome = Math.random() < 0.5;
+      roundRobinMatches.push({
+        home: isFirstHome ? allTeamIds[i] : allTeamIds[j],
+        away: isFirstHome ? allTeamIds[j] : allTeamIds[i],
+      });
+    }
+  }
 
-  // First 9 matches: play each opponent once
-  const firstRound: { opponent: string; isHome: boolean }[] = shuffled.map((opponent, i) => ({
-    opponent,
-    isHome: i % 2 === 0, // Alternate home/away
-  }));
+  // Step 2: Generate rematches (each team plays 5 more matches) = 25 more matches
+  // Each team needs 5 rematches to reach 14 total matches
+  const rematchCount: Record<string, number> = {};
+  allTeamIds.forEach(id => rematchCount[id] = 0);
 
-  // Next 5 matches: play 5 teams again (reverse home/away)
-  const secondRound = shuffled.slice(0, 5).map((opponent) => ({
-    opponent,
-    isHome: !firstRound.find(m => m.opponent === opponent)?.isHome, // Flip home/away
-  }));
+  const rematchMatches: { home: string; away: string }[] = [];
 
-  // Combine and shuffle for realistic schedule
-  const allMatches = [...firstRound, ...secondRound];
+  // Shuffle round-robin for variety in rematches
+  const shuffledRR = [...roundRobinMatches].sort(() => Math.random() - 0.5);
 
-  // Create fixtures
-  const fixtures: Match[] = allMatches.map((matchInfo, index) => {
-    const homeTeam = matchInfo.isHome ? playerTeamId : matchInfo.opponent;
-    const awayTeam = matchInfo.isHome ? matchInfo.opponent : playerTeamId;
-    const venue = venues[homeTeam] || 'Wankhede Stadium';
+  for (const match of shuffledRR) {
+    // Check if both teams need more matches
+    if (rematchCount[match.home] < 5 && rematchCount[match.away] < 5) {
+      // Reverse home/away for rematch
+      rematchMatches.push({
+        home: match.away,
+        away: match.home,
+      });
+      rematchCount[match.home]++;
+      rematchCount[match.away]++;
+    }
+  }
 
-    return {
+  // Combine all matches
+  const allMatches = [...roundRobinMatches, ...rematchMatches];
+
+  // Shuffle to create realistic schedule (not all rematches at end)
+  const shuffledMatches = allMatches.sort(() => Math.random() - 0.5);
+
+  // Prioritize player's matches to be spread throughout
+  const playerMatches = shuffledMatches.filter(m => m.home === playerTeamId || m.away === playerTeamId);
+  const aiMatches = shuffledMatches.filter(m => m.home !== playerTeamId && m.away !== playerTeamId);
+
+  // Interleave: roughly 1 player match per 4-5 AI matches
+  const interleavedMatches: { home: string; away: string }[] = [];
+  let playerIdx = 0;
+  let aiIdx = 0;
+
+  while (playerIdx < playerMatches.length || aiIdx < aiMatches.length) {
+    // Add 1 player match
+    if (playerIdx < playerMatches.length) {
+      interleavedMatches.push(playerMatches[playerIdx++]);
+    }
+    // Add 3-4 AI matches
+    const aiCount = 3 + Math.floor(Math.random() * 2);
+    for (let i = 0; i < aiCount && aiIdx < aiMatches.length; i++) {
+      interleavedMatches.push(aiMatches[aiIdx++]);
+    }
+  }
+
+  // Create fixture objects
+  interleavedMatches.forEach((matchInfo, index) => {
+    const venue = venues[matchInfo.home] || 'Wankhede Stadium';
+
+    fixtures.push({
       id: uuid(),
-      homeTeam,
-      awayTeam,
+      homeTeam: matchInfo.home,
+      awayTeam: matchInfo.away,
       venue,
       matchNumber: index + 1,
       matchType: 'league' as MatchType,
@@ -91,7 +134,7 @@ export const generateFixtures = (playerTeamId: string): Match[] => {
       innings1: null,
       innings2: null,
       result: null,
-    };
+    });
   });
 
   return fixtures;

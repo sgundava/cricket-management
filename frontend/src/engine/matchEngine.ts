@@ -24,23 +24,23 @@ const TOTAL_OVERS = 20;
 const BALLS_PER_OVER = 6;
 const MAX_OVERS_PER_BOWLER = 4; // T20 rule: overs / 5 = max per bowler
 
-// Base outcome probabilities (will be modified by skills, form, etc.)
-// Wicket at 5% = ~6 wickets per innings (realistic T20)
+// Base outcome probabilities - calibrated from IPL data (278K balls, 2009-2025)
+// Wicket at 5.1% = ~6 wickets per innings (realistic T20)
 const BASE_OUTCOMES = {
-  dot: 0.36,
-  single: 0.30,
-  two: 0.08,
-  three: 0.02,
-  four: 0.12,
-  six: 0.06,
-  wicket: 0.05,
+  dot: 0.326,
+  single: 0.382,
+  two: 0.065,
+  three: 0.003,
+  four: 0.119,
+  six: 0.053,
+  wicket: 0.051,
 };
 
-// Phase modifiers - subtle wicket differences
+// Phase modifiers - calibrated from IPL data
 const PHASE_MODIFIERS: Record<MatchPhase, { boundaryMod: number; wicketMod: number; runRate: number }> = {
-  powerplay: { boundaryMod: 1.2, wicketMod: 1.05, runRate: 8.5 },
-  middle: { boundaryMod: 0.9, wicketMod: 0.95, runRate: 7.5 },
-  death: { boundaryMod: 1.4, wicketMod: 1.1, runRate: 11 },
+  powerplay: { boundaryMod: 1.08, wicketMod: 0.76, runRate: 7.5 },  // Batters play safer!
+  middle: { boundaryMod: 0.85, wicketMod: 0.89, runRate: 7.8 },
+  death: { boundaryMod: 1.23, wicketMod: 1.78, runRate: 9.8 },      // Death overs are brutal
 };
 
 // Tactical approach modifiers - less extreme wicket effects
@@ -132,31 +132,31 @@ const BATSMAN_STATE_THRESHOLDS = {
   settling: 15, // Balls 7-15 - gradually opening up
 };
 
-// Batsman state modifiers - affects scoring style, NOT wicket probability
-// A cautious batsman plays safer shots = fewer boundaries, but NOT more wickets
+// Batsman state modifiers - calibrated from IPL data
+// Key insight: new batsmen are actually SAFER (0.90 wicket mod) because they play carefully
 const BATSMAN_STATE_MODIFIERS: Record<BatsmanState, {
   boundaryMod: number;    // Reduced boundaries when new
-  wicketMod: number;      // NO penalty - playing safe means safer shots
+  wicketMod: number;      // New batsmen are safer, set batsmen take risks
   dotMod: number;         // More dots when new
-  singleMod: number;      // More rotation when settling
+  singleMod: number;      // Better rotation when set
 }> = {
   'new': {
-    boundaryMod: 0.75,    // 25% fewer boundaries - getting eye in
-    wicketMod: 1.0,       // No wicket penalty - playing carefully
-    dotMod: 1.1,          // 10% more dot balls
-    singleMod: 1.0,
+    boundaryMod: 0.78,    // 22% fewer boundaries - getting eye in
+    wicketMod: 0.90,      // Actually SAFER - playing carefully
+    dotMod: 1.30,         // 30% more dot balls
+    singleMod: 0.88,
   },
   'settling': {
-    boundaryMod: 0.9,     // 10% fewer boundaries
-    wicketMod: 1.0,       // No wicket penalty
-    dotMod: 1.05,         // 5% more dots
-    singleMod: 1.0,
+    boundaryMod: 1.12,    // Opening up
+    wicketMod: 1.01,      // Neutral
+    dotMod: 0.97,
+    singleMod: 0.98,
   },
   'set': {
-    boundaryMod: 1.0,     // Full attacking mode
-    wicketMod: 1.0,       // Normal risk
-    dotMod: 1.0,
-    singleMod: 1.0,
+    boundaryMod: 1.11,    // Full attacking mode
+    wicketMod: 1.08,      // Taking more risks
+    dotMod: 0.74,         // Fewer dots
+    singleMod: 1.13,      // Better rotation
   },
 };
 
@@ -373,17 +373,18 @@ const checkBoundarySave = (
 };
 
 // Get dismissal type, factoring in fielding skills and field setting
+// Calibrated from IPL data - caught dominates at 65%!
 const getRandomDismissal = (
   fieldSetting: FieldSetting = 'balanced',
   teamFielding: { catching: number; throwing: number } = { catching: FIELDING_BASELINE, throwing: FIELDING_BASELINE }
 ): DismissalType => {
-  // Base distribution
-  let caught = 0.35;
-  let bowled = 0.20;
-  let lbw = 0.15;
-  let runout = 0.15;
-  let stumped = 0.10;
-  let hitwicket = 0.05;
+  // Base distribution - calibrated from IPL data
+  let caught = 0.65;
+  let bowled = 0.17;
+  let lbw = 0.06;
+  let runout = 0.08;
+  let stumped = 0.03;
+  let hitwicket = 0.01;
 
   // Adjust for field setting
   const fieldMod = FIELD_SETTING_MODIFIERS[fieldSetting];
@@ -676,10 +677,15 @@ export const simulateBall = (
     outcome = { type: 'wicket', dismissal: getRandomDismissal(fieldSetting, fielding), runs: 0 };
   }
 
-  // Small chance of extras
-  if (Math.random() < 0.03 && outcome.type === 'runs') {
-    const extraType = Math.random() < 0.7 ? 'wide' : 'noball';
-    outcome = { type: 'extra', extraType, runs: 1 };
+  // Small chance of extras - calibrated from IPL data
+  // Wide: 3.26%, No-ball: 0.41%
+  if (outcome.type === 'runs') {
+    const rand = Math.random();
+    if (rand < 0.0326) {
+      outcome = { type: 'extra', extraType: 'wide', runs: 1 };
+    } else if (rand < 0.0326 + 0.0041) {
+      outcome = { type: 'extra', extraType: 'noball', runs: 1 };
+    }
   }
 
   const narrative = generateNarrative(outcome, batter, bowler);

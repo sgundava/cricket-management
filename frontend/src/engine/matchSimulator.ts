@@ -90,6 +90,7 @@ export interface ValidationResult {
 // EXPECTED RANGES (from real T20/IPL data)
 // ============================================
 
+// Expected ranges calibrated from IPL data (2009-2025)
 const EXPECTED_RANGES = {
   avgScore: { min: 145, max: 180 },
   avgWickets: { min: 5, max: 8 },
@@ -97,7 +98,7 @@ const EXPECTED_RANGES = {
   dotBallRate: { min: 0.30, max: 0.45 },
   avgRunRate: { min: 7.0, max: 9.5 },
   chaseSuccessRate: { min: 0.40, max: 0.60 },
-  allOutRate: { min: 0.15, max: 0.45 },
+  allOutRate: { min: 0.05, max: 0.15 },  // IPL reality: 8.8% all-out rate
   scoresUnder100Rate: { min: 0, max: 0.05 },  // Should be rare
   scoresOver200Rate: { min: 0.02, max: 0.20 }, // Some high scores expected
 };

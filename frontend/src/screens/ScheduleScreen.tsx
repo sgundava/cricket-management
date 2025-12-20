@@ -469,10 +469,29 @@ export const ScheduleScreen = () => {
                       <div className="space-y-1 text-sm">
                         {(() => {
                           const batterEntries = getBatterStats(match.innings1);
-                          const battedPlayerIds = batterEntries.map(([id]) => id);
+                          const battedPlayerIds = new Set(batterEntries.map(([id]) => id));
                           const battingTeamId = match.innings1?.battingTeam;
+
+                          // Get playing XI from tactics, fall back to squad
+                          const isHomeTeamBatting = battingTeamId === match.homeTeam;
+                          const tactics = isHomeTeamBatting ? match.homeTactics : match.awayTactics;
+                          const playingXI = tactics?.playingXI || [];
+
+                          // Fall back to squad if no tactics
                           const battingTeam = teams.find(t => t.id === battingTeamId);
-                          const allSquadPlayers = battingTeam ? players.filter(p => battingTeam.squad.includes(p.id)).slice(0, 11) : [];
+                          const xiPlayerIds = playingXI.length > 0
+                            ? playingXI
+                            : (battingTeam?.squad.slice(0, 11) || []);
+
+                          // Also include players from fallOfWickets who might not have stats
+                          const fallOfWickets = match.innings1?.fallOfWickets || [];
+                          const outPlayerIds = new Set(fallOfWickets.map(fow => fow.player));
+
+                          // Combine: batted + got out = all who participated
+                          const participatedIds = new Set([...battedPlayerIds, ...outPlayerIds]);
+
+                          // Players who didn't bat = in XI but didn't participate
+                          const didNotBatIds = xiPlayerIds.filter(id => !participatedIds.has(id));
 
                           return (
                             <>
@@ -489,16 +508,15 @@ export const ScheduleScreen = () => {
                                   </div>
                                 );
                               })}
-                              {allSquadPlayers
-                                .filter(p => !battedPlayerIds.includes(p.id))
-                                .slice(0, 11 - batterEntries.length)
-                                .map(player => (
-                                  <div key={player.id} className="flex justify-between text-gray-600">
-                                    <span>{player.shortName}</span>
+                              {didNotBatIds.map(playerId => {
+                                const player = players.find(p => p.id === playerId);
+                                return (
+                                  <div key={playerId} className="flex justify-between text-gray-600">
+                                    <span>{player?.shortName || 'Unknown'}</span>
                                     <span className="text-xs italic">did not bat</span>
                                   </div>
-                                ))
-                              }
+                                );
+                              })}
                             </>
                           );
                         })()}
@@ -547,10 +565,29 @@ export const ScheduleScreen = () => {
                       <div className="space-y-1 text-sm">
                         {(() => {
                           const batterEntries = getBatterStats(match.innings2);
-                          const battedPlayerIds = batterEntries.map(([id]) => id);
+                          const battedPlayerIds = new Set(batterEntries.map(([id]) => id));
                           const battingTeamId = match.innings2?.battingTeam;
+
+                          // Get playing XI from tactics, fall back to squad
+                          const isHomeTeamBatting = battingTeamId === match.homeTeam;
+                          const tactics = isHomeTeamBatting ? match.homeTactics : match.awayTactics;
+                          const playingXI = tactics?.playingXI || [];
+
+                          // Fall back to squad if no tactics
                           const battingTeam = teams.find(t => t.id === battingTeamId);
-                          const allSquadPlayers = battingTeam ? players.filter(p => battingTeam.squad.includes(p.id)).slice(0, 11) : [];
+                          const xiPlayerIds = playingXI.length > 0
+                            ? playingXI
+                            : (battingTeam?.squad.slice(0, 11) || []);
+
+                          // Also include players from fallOfWickets who might not have stats
+                          const fallOfWickets = match.innings2?.fallOfWickets || [];
+                          const outPlayerIds = new Set(fallOfWickets.map(fow => fow.player));
+
+                          // Combine: batted + got out = all who participated
+                          const participatedIds = new Set([...battedPlayerIds, ...outPlayerIds]);
+
+                          // Players who didn't bat = in XI but didn't participate
+                          const didNotBatIds = xiPlayerIds.filter(id => !participatedIds.has(id));
 
                           return (
                             <>
@@ -567,16 +604,15 @@ export const ScheduleScreen = () => {
                                   </div>
                                 );
                               })}
-                              {allSquadPlayers
-                                .filter(p => !battedPlayerIds.includes(p.id))
-                                .slice(0, 11 - batterEntries.length)
-                                .map(player => (
-                                  <div key={player.id} className="flex justify-between text-gray-600">
-                                    <span>{player.shortName}</span>
+                              {didNotBatIds.map(playerId => {
+                                const player = players.find(p => p.id === playerId);
+                                return (
+                                  <div key={playerId} className="flex justify-between text-gray-600">
+                                    <span>{player?.shortName || 'Unknown'}</span>
                                     <span className="text-xs italic">did not bat</span>
                                   </div>
-                                ))
-                              }
+                                );
+                              })}
                             </>
                           );
                         })()}

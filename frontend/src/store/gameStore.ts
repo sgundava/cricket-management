@@ -18,6 +18,7 @@ import {
   TeamMeetingOption,
   TeamMeetingResult,
   AuctionState,
+  InningsState,
   AuctionType,
   AuctionPlayer,
   AuctionPlayerMode,
@@ -396,76 +397,254 @@ export const useGameStore = create<GameStore>()(
       },
 
       simulateBackgroundMatches: () => {
-        // Simulate 2-3 random AI vs AI matches when player finishes a match
-        const { teams, playerTeamId, pointsTable, matchDay } = get();
+        // Simulate AI vs AI matches when player finishes a match
+        // This now properly updates BOTH fixtures AND points table
+        const { teams, playerTeamId, pointsTable, fixtures, players } = get();
 
-        // Get all teams except player's team
-        const aiTeams = teams.filter((t) => t.id !== playerTeamId);
+        // Helper to generate batting stats for an innings
+        const generateBattingStats = (
+          teamId: string,
+          totalRuns: number,
+          totalWickets: number,
+          totalOvers: number
+        ) => {
+          const team = teams.find(t => t.id === teamId);
+          if (!team) return { batterStats: new Map(), fallOfWickets: [] };
 
-        // Simulate 4 AI matches per player match to ensure all teams play 14 games
-        // Math: 70 total matches needed, 14 player matches, so 56 AI matches / 14 = 4 per round
-        const numMatches = 4;
-        const newPointsTable = [...pointsTable];
-        const simulatedResults: { winner: string; loser: string; margin: string }[] = [];
+          const squadPlayers = players.filter(p => team.squad.includes(p.id)).slice(0, 11);
+          const batterStats = new Map<string, { runs: number; balls: number; fours: number; sixes: number }>();
+          const fallOfWickets: { player: string; runs: number; overs: number }[] = [];
 
-        // Keep track of teams that have already played this round
-        const teamsPlayedThisRound = new Set<string>();
+          // Number of batters who batted = wickets + 2 (not out batters), max 11
+          const batterCount = Math.min(totalWickets + 2, 11);
+          const batters = squadPlayers.slice(0, batterCount);
 
-        for (let i = 0; i < numMatches; i++) {
-          // Find two teams that haven't played this round
-          const availableTeams = aiTeams.filter((t) => !teamsPlayedThisRound.has(t.id));
-          if (availableTeams.length < 2) break;
+          let remainingRuns = totalRuns;
+          let remainingBalls = totalOvers * 6;
+          let teamRunsAtWicket = 0;
 
-          // Sort by games played (ascending) to balance schedule - teams with fewer games get priority
-          const sorted = availableTeams.sort((a, b) => {
-            const aPlayed = newPointsTable.find(e => e.teamId === a.id)?.played ?? 0;
-            const bPlayed = newPointsTable.find(e => e.teamId === b.id)?.played ?? 0;
-            // Primary: fewer games first, Secondary: random tiebreaker
-            if (aPlayed !== bPlayed) return aPlayed - bPlayed;
-            return Math.random() - 0.5;
+          batters.forEach((batter, index) => {
+            const isLastBatter = index === batters.length - 1;
+            const isNotOut = index >= totalWickets; // Last 2 batters are not out
+
+            // Distribute runs - top order scores more
+            const runShare = isLastBatter
+              ? remainingRuns
+              : Math.floor(remainingRuns * (0.3 - index * 0.02) * (0.8 + Math.random() * 0.4));
+            const runs = Math.max(0, Math.min(runShare, remainingRuns));
+            remainingRuns -= runs;
+
+            // Distribute balls
+            const ballShare = isLastBatter
+              ? remainingBalls
+              : Math.floor(remainingBalls * (0.25 - index * 0.015) * (0.8 + Math.random() * 0.4));
+            const balls = Math.max(1, Math.min(ballShare, remainingBalls));
+            remainingBalls -= balls;
+
+            // Calculate boundaries based on runs and strike rate
+            const sr = balls > 0 ? (runs / balls) * 100 : 0;
+            const sixes = sr > 150 ? Math.floor(runs / 30) : Math.floor(runs / 50);
+            const fours = Math.floor((runs - sixes * 6) / 10);
+
+            batterStats.set(batter.id, { runs, balls, fours, sixes });
+
+            // Add fall of wicket if out
+            if (!isNotOut && index < totalWickets) {
+              teamRunsAtWicket += runs;
+              const oversAtWicket = Math.round((totalOvers * (index + 1) / batterCount) * 10) / 10;
+              fallOfWickets.push({
+                player: batter.id,
+                runs: teamRunsAtWicket,
+                overs: Math.min(oversAtWicket, totalOvers),
+              });
+            }
           });
-          const team1 = sorted[0];
-          const team2 = sorted[1];
 
-          teamsPlayedThisRound.add(team1.id);
-          teamsPlayedThisRound.add(team2.id);
+          return { batterStats, fallOfWickets };
+        };
+
+        // Helper to generate bowling stats
+        const generateBowlingStats = (
+          teamId: string,
+          runsConceded: number,
+          wicketsTaken: number,
+          oversBowled: number
+        ) => {
+          const team = teams.find(t => t.id === teamId);
+          if (!team) return new Map();
+
+          // Get bowlers from squad (bowlers and allrounders)
+          const squadPlayers = players.filter(p => team.squad.includes(p.id));
+          const bowlers = squadPlayers
+            .filter(p => p.role === 'bowler' || p.role === 'allrounder')
+            .slice(0, 5); // Max 5 bowlers
+
+          const bowlerStats = new Map<string, { overs: number; runs: number; wickets: number; dots: number }>();
+
+          let remainingOvers = oversBowled;
+          let remainingRuns = runsConceded;
+          let remainingWickets = wicketsTaken;
+
+          bowlers.forEach((bowler, index) => {
+            const isLastBowler = index === bowlers.length - 1;
+
+            // Each bowler gets 3-4 overs, max 4
+            const overs = isLastBowler
+              ? Math.min(remainingOvers, 4)
+              : Math.min(3 + Math.floor(Math.random() * 2), remainingOvers, 4);
+            remainingOvers -= overs;
+
+            // Distribute runs proportionally
+            const runs = isLastBowler
+              ? remainingRuns
+              : Math.floor(remainingRuns * (overs / oversBowled) * (0.8 + Math.random() * 0.4));
+            remainingRuns -= runs;
+
+            // Distribute wickets
+            const wickets = isLastBowler
+              ? remainingWickets
+              : Math.floor(remainingWickets * (0.3 + Math.random() * 0.2));
+            remainingWickets = Math.max(0, remainingWickets - wickets);
+
+            // Calculate dots based on economy
+            const economy = overs > 0 ? runs / overs : 8;
+            const dots = Math.floor(overs * 6 * (economy < 7 ? 0.4 : economy < 9 ? 0.3 : 0.2));
+
+            if (overs > 0) {
+              bowlerStats.set(bowler.id, { overs, runs, wickets, dots });
+            }
+          });
+
+          return bowlerStats;
+        };
+
+        // Find upcoming AI vs AI league matches (not involving player's team)
+        const upcomingAIMatches = fixtures.filter(
+          (m) =>
+            m.status === 'upcoming' &&
+            m.matchType === 'league' &&
+            m.homeTeam !== playerTeamId &&
+            m.awayTeam !== playerTeamId
+        );
+
+        // Simulate 4 AI matches per player match to keep pace
+        const matchesToSimulate = upcomingAIMatches.slice(0, 4);
+
+        if (matchesToSimulate.length === 0) return;
+
+        const newPointsTable = [...pointsTable];
+        const updatedFixtures = [...fixtures];
+
+        for (const match of matchesToSimulate) {
+          const homeTeam = teams.find((t) => t.id === match.homeTeam);
+          const awayTeam = teams.find((t) => t.id === match.awayTeam);
+
+          if (!homeTeam || !awayTeam) continue;
 
           // Determine winner based on team reputation (with randomness)
-          const team1Strength = team1.reputation + Math.random() * 30;
-          const team2Strength = team2.reputation + Math.random() * 30;
+          const homeStrength = homeTeam.reputation + Math.random() * 30 + 5; // Home advantage
+          const awayStrength = awayTeam.reputation + Math.random() * 30;
 
-          const winner = team1Strength > team2Strength ? team1 : team2;
-          const loser = winner.id === team1.id ? team2 : team1;
+          const homeWins = homeStrength > awayStrength;
 
-          // Generate a random margin
-          const isWickets = Math.random() < 0.5;
-          const margin = isWickets
-            ? `${Math.floor(Math.random() * 7) + 1} wickets`
-            : `${Math.floor(Math.random() * 40) + 5} runs`;
+          // Generate realistic scores
+          const firstInningsRuns = 140 + Math.floor(Math.random() * 60); // 140-200
+          const firstInningsWickets = 4 + Math.floor(Math.random() * 5); // 4-8 wickets
+          const firstInningsOvers = firstInningsWickets >= 10 ? 17 + Math.floor(Math.random() * 3) : 20;
+
+          let secondInningsRuns: number;
+          let secondInningsWickets: number;
+          let secondInningsOvers: number;
+
+          if (homeWins) {
+            // Chasing team (home) wins
+            secondInningsRuns = firstInningsRuns + 1;
+            secondInningsWickets = 2 + Math.floor(Math.random() * 6); // 2-7 wickets
+            secondInningsOvers = 16 + Math.floor(Math.random() * 4); // 16-19 overs
+          } else {
+            // Defending team (away) wins - chase fails
+            secondInningsRuns = firstInningsRuns - 5 - Math.floor(Math.random() * 35); // Fall short by 5-40
+            secondInningsWickets = 7 + Math.floor(Math.random() * 4); // 7-10 wickets
+            secondInningsOvers = secondInningsWickets >= 10 ? 15 + Math.floor(Math.random() * 5) : 20;
+          }
+
+          // Generate player stats for both innings
+          const batting1 = generateBattingStats(match.awayTeam, firstInningsRuns, firstInningsWickets, firstInningsOvers);
+          const bowling1 = generateBowlingStats(match.homeTeam, firstInningsRuns, firstInningsWickets, firstInningsOvers);
+          const batting2 = generateBattingStats(match.homeTeam, secondInningsRuns, secondInningsWickets, secondInningsOvers);
+          const bowling2 = generateBowlingStats(match.awayTeam, secondInningsRuns, secondInningsWickets, secondInningsOvers);
+
+          // Create innings state with player stats
+          const innings1: InningsState = {
+            battingTeam: match.awayTeam, // Away bats first
+            bowlingTeam: match.homeTeam,
+            runs: firstInningsRuns,
+            wickets: firstInningsWickets,
+            overs: firstInningsOvers,
+            balls: firstInningsOvers * 6,
+            currentBatters: ['', ''],
+            currentBowler: '',
+            overSummaries: [],
+            fallOfWickets: batting1.fallOfWickets,
+            batterStats: batting1.batterStats,
+            bowlerStats: bowling1,
+          };
+
+          const innings2: InningsState = {
+            battingTeam: match.homeTeam, // Home chases
+            bowlingTeam: match.awayTeam,
+            runs: secondInningsRuns,
+            wickets: secondInningsWickets,
+            overs: secondInningsOvers,
+            balls: secondInningsOvers * 6,
+            currentBatters: ['', ''],
+            currentBowler: '',
+            overSummaries: [],
+            fallOfWickets: batting2.fallOfWickets,
+            batterStats: batting2.batterStats,
+            bowlerStats: bowling2,
+          };
+
+          // Update the fixture
+          const fixtureIndex = updatedFixtures.findIndex((f) => f.id === match.id);
+          if (fixtureIndex !== -1) {
+            updatedFixtures[fixtureIndex] = {
+              ...updatedFixtures[fixtureIndex],
+              status: 'completed',
+              innings1,
+              innings2,
+              tossWinner: match.awayTeam,
+              tossDecision: 'bat',
+            };
+          }
 
           // Update points table
-          const winnerEntry = newPointsTable.find((e) => e.teamId === winner.id);
-          const loserEntry = newPointsTable.find((e) => e.teamId === loser.id);
+          const winnerId = homeWins ? match.homeTeam : match.awayTeam;
+          const loserId = homeWins ? match.awayTeam : match.homeTeam;
+
+          const winnerEntry = newPointsTable.find((e) => e.teamId === winnerId);
+          const loserEntry = newPointsTable.find((e) => e.teamId === loserId);
+
+          // Calculate NRR impact
+          const winnerOvers = homeWins ? secondInningsOvers : firstInningsOvers;
+          const winnerRuns = homeWins ? secondInningsRuns : firstInningsRuns;
+          const loserOvers = homeWins ? firstInningsOvers : secondInningsOvers;
+          const loserRuns = homeWins ? firstInningsRuns : secondInningsRuns;
 
           if (winnerEntry) {
             winnerEntry.played += 1;
             winnerEntry.won += 1;
             winnerEntry.points += 2;
-            // Add random NRR boost for winner (0.1 to 0.5)
-            winnerEntry.netRunRate += (Math.random() * 0.4 + 0.1);
+            // NRR = (Runs scored / Overs faced) - (Runs conceded / Overs bowled)
+            const nrrDelta = (winnerRuns / winnerOvers) - (loserRuns / loserOvers);
+            winnerEntry.netRunRate += nrrDelta * 0.1; // Scale down for cumulative effect
           }
           if (loserEntry) {
             loserEntry.played += 1;
             loserEntry.lost += 1;
-            // Subtract random NRR for loser (0.1 to 0.5)
-            loserEntry.netRunRate -= (Math.random() * 0.4 + 0.1);
+            const nrrDelta = (loserRuns / loserOvers) - (winnerRuns / winnerOvers);
+            loserEntry.netRunRate += nrrDelta * 0.1;
           }
-
-          simulatedResults.push({
-            winner: winner.shortName,
-            loser: loser.shortName,
-            margin,
-          });
         }
 
         // Round NRR to 3 decimal places
@@ -473,10 +652,7 @@ export const useGameStore = create<GameStore>()(
           entry.netRunRate = Math.round(entry.netRunRate * 1000) / 1000;
         });
 
-        set({ pointsTable: newPointsTable });
-
-        // Store simulated results for display (could be used for a news feed later)
-        console.log('Background matches simulated:', simulatedResults);
+        set({ fixtures: updatedFixtures, pointsTable: newPointsTable });
       },
 
       // ----------------------------------------

@@ -7,37 +7,37 @@
 # ============================================
 # BASE OUTCOME PROBABILITIES
 # ============================================
-# Expected per-ball distribution in neutral conditions
-# Wicket at 5% = ~6 wickets per 120 balls (realistic T20)
+# Calibrated from IPL data (278K balls, 1169 matches, 2009-2025)
+# Wicket at 5.1% = ~6 wickets per 120 balls (realistic T20)
 base_outcomes:
-  dot: 0.36
-  single: 0.30
-  two: 0.08
-  three: 0.02
-  four: 0.12
-  six: 0.06
-  wicket: 0.05
+  dot: 0.326
+  single: 0.382
+  two: 0.065
+  three: 0.003
+  four: 0.119
+  six: 0.053
+  wicket: 0.051
 
 # ============================================
 # PHASE MODIFIERS
 # ============================================
-# Multipliers applied based on match phase (powerplay, middle, death)
+# Calibrated from IPL data - multipliers applied based on match phase
 phase_modifiers:
   powerplay:
-    boundary_mod: 1.20    # More attacking in PP
-    wicket_mod: 1.05      # Slightly more risk
-    dot_mod: 0.90
-    run_rate_target: 8.5  # Expected run rate
+    boundary_mod: 1.08    # Slight boundary boost
+    wicket_mod: 0.76      # Batters play safer in PP (surprising finding!)
+    dot_mod: 1.32         # More defensive play
+    run_rate_target: 7.5  # Expected run rate
   middle:
-    boundary_mod: 0.90    # Consolidation phase
-    wicket_mod: 0.95      # Safer batting
-    dot_mod: 1.10
-    run_rate_target: 7.5
+    boundary_mod: 0.85    # Consolidation phase
+    wicket_mod: 0.89      # Safer batting
+    dot_mod: 0.87
+    run_rate_target: 7.8
   death:
-    boundary_mod: 1.40    # Big hitting phase
-    wicket_mod: 1.10      # High risk swings
-    dot_mod: 0.80
-    run_rate_target: 11.0
+    boundary_mod: 1.23    # Big hitting phase
+    wicket_mod: 1.78      # High risk swings - nearly 2x wicket rate!
+    dot_mod: 0.68
+    run_rate_target: 9.8
 
 # ============================================
 # TACTICAL APPROACH MODIFIERS
@@ -116,27 +116,27 @@ field_setting_modifiers:
 # ============================================
 # BATSMAN STATE MODIFIERS
 # ============================================
-# Based on balls faced by the batter (settling-in period)
+# Calibrated from IPL data - based on balls faced by the batter
 batsman_state:
   thresholds:
     new: 6          # First 6 balls
     settling: 15    # Balls 7-15
   modifiers:
     new:
-      boundary_mod: 0.75    # Getting eye in
-      wicket_mod: 1.00      # No penalty - playing carefully
-      dot_mod: 1.10
-      single_mod: 1.00
+      boundary_mod: 0.78    # Getting eye in
+      wicket_mod: 0.90      # Actually SAFER - playing carefully
+      dot_mod: 1.30         # Many more dots
+      single_mod: 0.88
     settling:
-      boundary_mod: 0.90
-      wicket_mod: 1.00
-      dot_mod: 1.05
-      single_mod: 1.00
+      boundary_mod: 1.12    # Opening up
+      wicket_mod: 1.01
+      dot_mod: 0.97
+      single_mod: 0.98
     set:
-      boundary_mod: 1.00    # Full confidence
-      wicket_mod: 1.00
-      dot_mod: 1.00
-      single_mod: 1.00
+      boundary_mod: 1.11    # Full confidence
+      wicket_mod: 1.08      # Taking more risks
+      dot_mod: 0.74         # Fewer dots
+      single_mod: 1.13      # Better rotation
 
 # ============================================
 # PRESSURE/MOMENTUM MODIFIERS
@@ -229,31 +229,32 @@ pitch:
 # ============================================
 # DISMISSAL TYPE DISTRIBUTION
 # ============================================
+# Calibrated from IPL data - caught dominates at 65%!
 dismissals:
   base:
-    caught: 0.35
-    bowled: 0.20
-    lbw: 0.15
-    runout: 0.15
-    stumped: 0.10
-    hitwicket: 0.05
+    caught: 0.65
+    bowled: 0.17
+    lbw: 0.06
+    runout: 0.08
+    stumped: 0.03
+    hitwicket: 0.01
 
   # Adjustments by bowler type
   fast_bowler:
-    caught: 0.40
-    bowled: 0.25
-    lbw: 0.18
-    runout: 0.12
+    caught: 0.68
+    bowled: 0.18
+    lbw: 0.08
+    runout: 0.05
     stumped: 0.00
-    hitwicket: 0.05
+    hitwicket: 0.01
 
   spin_bowler:
-    caught: 0.30
-    bowled: 0.15
-    lbw: 0.15
-    runout: 0.10
-    stumped: 0.25
-    hitwicket: 0.05
+    caught: 0.60
+    bowled: 0.14
+    lbw: 0.05
+    runout: 0.06
+    stumped: 0.14
+    hitwicket: 0.01
 
 # ============================================
 # FIELDING IMPACT
@@ -274,7 +275,8 @@ fielding:
 # ============================================
 # EXTRAS
 # ============================================
+# Calibrated from IPL data
 extras:
-  wide_chance: 0.02       # Per ball
-  noball_chance: 0.01     # Per ball
+  wide_chance: 0.0326     # Per ball (3.26% - higher than expected)
+  noball_chance: 0.0041   # Per ball (0.41% - lower than expected)
   accuracy_impact: -0.0002    # Per accuracy point
