@@ -13,6 +13,8 @@ export const ScheduleScreen = () => {
     pointsTable,
     navigateTo,
     selectMatch,
+    openPlayerModal,
+    openTeamModal,
   } = useGameStore();
 
   const [filter, setFilter] = useState<Filter>('your');
@@ -381,32 +383,46 @@ export const ScheduleScreen = () => {
                       {/* Key Players */}
                       <div className="grid grid-cols-2 gap-2 mb-3">
                         {opponentStats.topBatter && (
-                          <div className="bg-gray-700/50 rounded p-2">
+                          <button
+                            onClick={() => openPlayerModal(opponentStats.topBatter!.id, true)}
+                            className="bg-gray-700/50 rounded p-2 text-left hover:bg-gray-700 transition-colors"
+                          >
                             <div className="text-xs text-gray-400">Top Batter</div>
-                            <div className="text-sm">{opponentStats.topBatter.shortName}</div>
+                            <div className="text-sm text-blue-400 hover:text-blue-300">{opponentStats.topBatter.shortName}</div>
                             <div className={`text-xs ${opponentStats.topBatter.form > 5 ? 'text-green-400' : opponentStats.topBatter.form < -5 ? 'text-red-400' : 'text-gray-400'}`}>
                               Form: {opponentStats.topBatter.form > 0 ? '+' : ''}{opponentStats.topBatter.form}
                             </div>
-                          </div>
+                          </button>
                         )}
                         {opponentStats.topBowler && (
-                          <div className="bg-gray-700/50 rounded p-2">
+                          <button
+                            onClick={() => openPlayerModal(opponentStats.topBowler!.id, true)}
+                            className="bg-gray-700/50 rounded p-2 text-left hover:bg-gray-700 transition-colors"
+                          >
                             <div className="text-xs text-gray-400">Top Bowler</div>
-                            <div className="text-sm">{opponentStats.topBowler.shortName}</div>
+                            <div className="text-sm text-blue-400 hover:text-blue-300">{opponentStats.topBowler.shortName}</div>
                             <div className={`text-xs ${opponentStats.topBowler.form > 5 ? 'text-green-400' : opponentStats.topBowler.form < -5 ? 'text-red-400' : 'text-gray-400'}`}>
                               Form: {opponentStats.topBowler.form > 0 ? '+' : ''}{opponentStats.topBowler.form}
                             </div>
-                          </div>
+                          </button>
                         )}
                       </div>
 
-                      {/* Prepare Button */}
-                      <button
-                        onClick={() => handlePrepareMatch(match.id)}
-                        className="w-full py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-medium transition-colors"
-                      >
-                        Prepare for Match
-                      </button>
+                      {/* Action Buttons */}
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => openTeamModal(opponentId, true)}
+                          className="flex-1 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm font-medium transition-colors"
+                        >
+                          View Squad
+                        </button>
+                        <button
+                          onClick={() => handlePrepareMatch(match.id)}
+                          className="flex-1 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm font-medium transition-colors"
+                        >
+                          Prepare for Match
+                        </button>
+                      </div>
                     </div>
                   )}
 
@@ -500,7 +516,12 @@ export const ScheduleScreen = () => {
                                 const sr = stats.balls > 0 ? ((stats.runs / stats.balls) * 100).toFixed(0) : '0';
                                 return (
                                   <div key={playerId} className="flex justify-between">
-                                    <span className="text-gray-300">{player?.shortName || 'Unknown'}</span>
+                                    <button
+                                      onClick={() => openPlayerModal(playerId, false)}
+                                      className="text-blue-400 hover:text-blue-300 hover:underline text-left"
+                                    >
+                                      {player?.shortName || 'Unknown'}
+                                    </button>
                                     <span>
                                       {stats.runs} ({stats.balls})
                                       <span className="text-gray-500 text-xs ml-1">SR {sr}</span>
@@ -532,7 +553,12 @@ export const ScheduleScreen = () => {
                           const econ = stats.overs > 0 ? (stats.runs / stats.overs).toFixed(1) : '0.0';
                           return (
                             <div key={playerId} className="flex justify-between">
-                              <span className="text-gray-300">{player?.shortName || 'Unknown'}</span>
+                              <button
+                                onClick={() => openPlayerModal(playerId, false)}
+                                className="text-blue-400 hover:text-blue-300 hover:underline text-left"
+                              >
+                                {player?.shortName || 'Unknown'}
+                              </button>
                               <span>
                                 {stats.wickets}/{stats.runs} ({stats.overs} ov)
                                 <span className="text-gray-500 text-xs ml-1">Econ {econ}</span>
@@ -596,7 +622,12 @@ export const ScheduleScreen = () => {
                                 const sr = stats.balls > 0 ? ((stats.runs / stats.balls) * 100).toFixed(0) : '0';
                                 return (
                                   <div key={playerId} className="flex justify-between">
-                                    <span className="text-gray-300">{player?.shortName || 'Unknown'}</span>
+                                    <button
+                                      onClick={() => openPlayerModal(playerId, false)}
+                                      className="text-blue-400 hover:text-blue-300 hover:underline text-left"
+                                    >
+                                      {player?.shortName || 'Unknown'}
+                                    </button>
                                     <span>
                                       {stats.runs} ({stats.balls})
                                       <span className="text-gray-500 text-xs ml-1">SR {sr}</span>
@@ -628,7 +659,12 @@ export const ScheduleScreen = () => {
                           const econ = stats.overs > 0 ? (stats.runs / stats.overs).toFixed(1) : '0.0';
                           return (
                             <div key={playerId} className="flex justify-between">
-                              <span className="text-gray-300">{player?.shortName || 'Unknown'}</span>
+                              <button
+                                onClick={() => openPlayerModal(playerId, false)}
+                                className="text-blue-400 hover:text-blue-300 hover:underline text-left"
+                              >
+                                {player?.shortName || 'Unknown'}
+                              </button>
                               <span>
                                 {stats.wickets}/{stats.runs} ({stats.overs} ov)
                                 <span className="text-gray-500 text-xs ml-1">Econ {econ}</span>

@@ -27,6 +27,7 @@ export const EventScreen = () => {
     players,
     resolveEvent,
     navigateTo,
+    openPlayerModal,
   } = useGameStore();
 
   // Get first unresolved event
@@ -71,18 +72,22 @@ export const EventScreen = () => {
         {/* Event Description */}
         <div className="bg-gray-800 rounded-xl p-5 border border-gray-700">
           {involvedPlayer && (
-            <div className="flex items-center gap-3 mb-4 pb-4 border-b border-gray-700">
+            <button
+              onClick={() => openPlayerModal(involvedPlayer.id, false)}
+              className="flex items-center gap-3 mb-4 pb-4 border-b border-gray-700 w-full text-left hover:bg-gray-700/30 -mx-2 px-2 py-2 rounded-lg transition-colors"
+            >
               <div className="w-12 h-12 bg-gray-700 rounded-full flex items-center justify-center text-lg font-bold">
                 {involvedPlayer.shortName.charAt(0)}
               </div>
               <div>
-                <div className="font-medium">{involvedPlayer.name}</div>
+                <div className="font-medium text-blue-400 hover:text-blue-300">{involvedPlayer.name}</div>
                 <div className="text-sm text-gray-400">
                   {involvedPlayer.role.charAt(0).toUpperCase() + involvedPlayer.role.slice(1)} •
                   Morale: {involvedPlayer.morale} • Form: {involvedPlayer.form > 0 ? '+' : ''}{involvedPlayer.form}
                 </div>
               </div>
-            </div>
+              <span className="ml-auto text-gray-500 text-sm">View Profile</span>
+            </button>
           )}
 
           <p className="text-gray-200 leading-relaxed">

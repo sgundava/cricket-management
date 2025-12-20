@@ -70,6 +70,12 @@ interface GameStore extends GameState, UIState {
   selectEvent: (eventId: string | null) => void;
   setSimulationSpeed: (speed: UIState['simulationSpeed']) => void;
 
+  // Modal management
+  openPlayerModal: (playerId: string, allowStacking?: boolean) => void;
+  openTeamModal: (teamId: string, allowStacking?: boolean) => void;
+  closeModal: () => void;
+  closeAllModals: () => void;
+
   // Player management
   updatePlayer: (playerId: string, updates: Partial<Player>) => void;
   updatePlayerState: (playerId: string, updates: Partial<Pick<Player, 'form' | 'fitness' | 'morale' | 'fatigue'>>) => void;
@@ -221,6 +227,7 @@ const initialUIState: UIState = {
   selectedMatchId: null,
   selectedEventId: null,
   simulationSpeed: 'over-by-over',
+  modalStack: [],
 };
 
 const initialAuctionState: AuctionState | null = null;
@@ -309,6 +316,35 @@ export const useGameStore = create<GameStore>()(
 
       setSimulationSpeed: (speed: UIState['simulationSpeed']) => {
         set({ simulationSpeed: speed });
+      },
+
+      // ----------------------------------------
+      // Modal Management
+      // ----------------------------------------
+      openPlayerModal: (playerId: string, allowStacking = false) => {
+        set((state) => ({
+          modalStack: allowStacking
+            ? [...state.modalStack, { type: 'player' as const, id: playerId }]
+            : [{ type: 'player' as const, id: playerId }],
+        }));
+      },
+
+      openTeamModal: (teamId: string, allowStacking = false) => {
+        set((state) => ({
+          modalStack: allowStacking
+            ? [...state.modalStack, { type: 'team' as const, id: teamId }]
+            : [{ type: 'team' as const, id: teamId }],
+        }));
+      },
+
+      closeModal: () => {
+        set((state) => ({
+          modalStack: state.modalStack.slice(0, -1),
+        }));
+      },
+
+      closeAllModals: () => {
+        set({ modalStack: [] });
       },
 
       // ----------------------------------------
@@ -2381,9 +2417,51 @@ export const useGameStore = create<GameStore>()(
         liveMatchState: state.liveMatchState,
       }),
       onRehydrateStorage: () => (state) => {
+        if (!state) return;
+
         // Generate testerId for existing games that don't have one
-        if (state && state.initialized && !state.testerId) {
+        if (state.initialized && !state.testerId) {
           useGameStore.setState({ testerId: generateTesterId() });
+        }
+
+        // State migration and validation for backwards compatibility
+        try {
+          // Ensure modalStack exists (added in modal update)
+          if (!Array.isArray(state.modalStack)) {
+            useGameStore.setState({ modalStack: [] });
+          }
+
+          // Validate auctionState structure if it exists
+          if (state.auctionState) {
+            // Ensure required properties exist
+            if (typeof state.auctionState.status !== 'string') {
+              console.warn('Invalid auctionState.status, resetting auction');
+              useGameStore.setState({ auctionState: null });
+            }
+          }
+
+          // Validate liveMatchState structure if it exists
+          if (state.liveMatchState) {
+            if (!state.liveMatchState.matchId || !state.liveMatchState.inningsState) {
+              console.warn('Invalid liveMatchState, clearing');
+              useGameStore.setState({ liveMatchState: null });
+            }
+          }
+
+          // Ensure pointsTable exists and is valid
+          if (!Array.isArray(state.pointsTable)) {
+            console.warn('Invalid pointsTable, regenerating');
+            // Will be regenerated on next game action
+          }
+
+          // Ensure fixtures array exists
+          if (!Array.isArray(state.fixtures)) {
+            console.warn('Invalid fixtures, this may cause issues');
+          }
+
+        } catch (error) {
+          console.error('State migration error:', error);
+          // Don't crash, let ErrorBoundary handle if needed
         }
       },
     }

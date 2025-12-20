@@ -615,12 +615,18 @@ export type Screen =
   | 'auction'
   | 'release-phase';
 
+export interface ModalEntry {
+  type: 'player' | 'team';
+  id: string;
+}
+
 export interface UIState {
   currentScreen: Screen;
   selectedPlayerId: string | null;
   selectedMatchId: string | null;
   selectedEventId: string | null;
   simulationSpeed: 'ball-by-ball' | 'over-by-over' | 'instant';
+  modalStack: ModalEntry[];
 }
 
 // ============================================

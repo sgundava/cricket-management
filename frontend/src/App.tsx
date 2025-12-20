@@ -1,8 +1,10 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useGameStore } from './store/gameStore';
 import { NavBar } from './components/NavBar';
 import { GlobalMenu } from './components/GlobalMenu';
 import { DebugButton } from './components/DebugButton';
+import { ModalContainer } from './components/ModalContainer';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import {
   StartScreen,
   HomeScreen,
@@ -24,28 +26,40 @@ import {
 function App() {
   const { initialized, currentScreen, phase, auctionState, liveMatchState, navigateTo, selectMatch } = useGameStore();
 
+  // Track if we've already done initial navigation to prevent loops
+  const hasNavigatedRef = useRef(false);
+
   // Restore correct screen based on persisted phase (currentScreen is not persisted)
+  // Only run once on initial load to prevent infinite loops
   useEffect(() => {
-    if (!initialized) return;
+    if (!initialized || hasNavigatedRef.current) return;
 
     // If there's a live match in progress, navigate to match-live
-    if (liveMatchState && currentScreen !== 'match-live') {
+    if (liveMatchState?.matchId) {
+      hasNavigatedRef.current = true;
       selectMatch(liveMatchState.matchId);
       navigateTo('match-live');
       return;
     }
 
     // If in auction phase with active auction, navigate to auction screen
-    if (phase === 'auction' && auctionState && auctionState.status !== 'completed') {
-      if (currentScreen !== 'auction') {
-        navigateTo('auction');
-      }
+    if (phase === 'auction' && auctionState?.status && auctionState.status !== 'completed') {
+      hasNavigatedRef.current = true;
+      navigateTo('auction');
+      return;
     }
-  }, [initialized, phase, auctionState, liveMatchState, currentScreen, navigateTo, selectMatch]);
+
+    // Mark as navigated even if no navigation needed (initial load complete)
+    hasNavigatedRef.current = true;
+  }, [initialized]); // Only depend on initialized to run once
 
   // Show start screen if game not initialized
   if (!initialized) {
-    return <StartScreen />;
+    return (
+      <ErrorBoundary>
+        <StartScreen />
+      </ErrorBoundary>
+    );
   }
 
   // Screens that should hide the nav bar
@@ -88,13 +102,20 @@ function App() {
     }
   };
 
+  // Screens where stacked modals are allowed (experiment)
+  const stackingScreens = ['schedule'];
+  const allowStacking = stackingScreens.includes(currentScreen);
+
   return (
-    <div className="min-h-screen bg-gray-900">
-      <GlobalMenu />
-      <DebugButton />
-      {renderScreen()}
-      {showNav && <NavBar />}
-    </div>
+    <ErrorBoundary>
+      <div className="min-h-screen bg-gray-900">
+        <GlobalMenu />
+        <DebugButton />
+        {renderScreen()}
+        {showNav && <NavBar />}
+        <ModalContainer allowStacking={allowStacking} />
+      </div>
+    </ErrorBoundary>
   );
 }
 
