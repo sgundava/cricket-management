@@ -6,7 +6,7 @@ A cricket franchise management simulation game (IPL/Football Manager style).
 
 ```
 ├── frontend/     # React + TypeScript + Vite
-└── backend/      # Coming soon (Node.js API)
+└── backend/      # WIP
 ```
 
 ## Quick Start
