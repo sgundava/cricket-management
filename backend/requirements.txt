@@ -1,0 +1,23 @@
+# Core
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+pydantic>=2.5.0
+pydantic-settings>=2.1.0
+
+# YAML config
+pyyaml>=6.0
+
+# CORS and HTTP
+httpx>=0.26.0
+
+# Database (optional, for cloud saves)
+# sqlalchemy>=2.0
+# asyncpg>=0.29.0
+# redis>=5.0
+
+# Testing
+pytest>=7.4.0
+pytest-asyncio>=0.23.0
+
+# Development
+python-dotenv>=1.0.0

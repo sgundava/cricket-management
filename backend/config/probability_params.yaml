@@ -1,0 +1,280 @@
+# Cricket Match Engine Probability Parameters
+# Calibrated from IPL historical data (to be updated with real analysis)
+#
+# These parameters can be A/B tested and tuned without code changes.
+# All probabilities should sum to 1.0 within their group.
+
+# ============================================
+# BASE OUTCOME PROBABILITIES
+# ============================================
+# Expected per-ball distribution in neutral conditions
+# Wicket at 5% = ~6 wickets per 120 balls (realistic T20)
+base_outcomes:
+  dot: 0.36
+  single: 0.30
+  two: 0.08
+  three: 0.02
+  four: 0.12
+  six: 0.06
+  wicket: 0.05
+
+# ============================================
+# PHASE MODIFIERS
+# ============================================
+# Multipliers applied based on match phase (powerplay, middle, death)
+phase_modifiers:
+  powerplay:
+    boundary_mod: 1.20    # More attacking in PP
+    wicket_mod: 1.05      # Slightly more risk
+    dot_mod: 0.90
+    run_rate_target: 8.5  # Expected run rate
+  middle:
+    boundary_mod: 0.90    # Consolidation phase
+    wicket_mod: 0.95      # Safer batting
+    dot_mod: 1.10
+    run_rate_target: 7.5
+  death:
+    boundary_mod: 1.40    # Big hitting phase
+    wicket_mod: 1.10      # High risk swings
+    dot_mod: 0.80
+    run_rate_target: 11.0
+
+# ============================================
+# TACTICAL APPROACH MODIFIERS
+# ============================================
+# Based on batting team's tactical approach selection
+tactical_modifiers:
+  aggressive:
+    boundary_mod: 1.25
+    wicket_mod: 1.10
+    dot_mod: 0.85
+  balanced:
+    boundary_mod: 1.00
+    wicket_mod: 1.00
+    dot_mod: 1.00
+  cautious:
+    boundary_mod: 0.75
+    wicket_mod: 0.90
+    dot_mod: 1.15
+
+# ============================================
+# BOWLING LENGTH MODIFIERS
+# ============================================
+# Based on bowler's selected length
+bowling_length_modifiers:
+  good-length:
+    boundary_mod: 1.00
+    wicket_mod: 1.00
+    dot_mod: 1.00
+    skill_type: accuracy
+    min_skill: 0
+  short:
+    boundary_mod: 1.30    # Can be pulled/hooked
+    wicket_mod: 1.08      # Top edge catches
+    dot_mod: 0.85
+    skill_type: speed
+    min_skill: 65
+  yorkers:
+    boundary_mod: 0.70    # Hard to hit boundaries
+    wicket_mod: 1.05      # LBW, bowled
+    dot_mod: 1.30         # Many dots
+    skill_type: accuracy
+    min_skill: 70         # Need skill to execute
+  full-pitched:
+    boundary_mod: 1.15    # Driving options
+    wicket_mod: 1.10      # Can get driven in air
+    dot_mod: 0.95
+    skill_type: accuracy
+    min_skill: 50
+
+# ============================================
+# FIELD SETTING MODIFIERS
+# ============================================
+# Based on bowling team's field setting
+field_setting_modifiers:
+  attacking:
+    boundary_mod: 1.25    # Gaps in outfield
+    wicket_mod: 1.10      # More catching positions
+    catch_mod: 1.15
+    runout_mod: 0.90
+  balanced:
+    boundary_mod: 1.00
+    wicket_mod: 1.00
+    catch_mod: 1.00
+    runout_mod: 1.00
+  defensive:
+    boundary_mod: 0.70    # Boundary riders
+    wicket_mod: 0.90      # Fewer catchers
+    catch_mod: 0.85
+    runout_mod: 1.10
+  death-field:
+    boundary_mod: 0.60    # Long-off, long-on, deep
+    wicket_mod: 0.95
+    catch_mod: 1.05       # High catches
+    runout_mod: 1.15
+
+# ============================================
+# BATSMAN STATE MODIFIERS
+# ============================================
+# Based on balls faced by the batter (settling-in period)
+batsman_state:
+  thresholds:
+    new: 6          # First 6 balls
+    settling: 15    # Balls 7-15
+  modifiers:
+    new:
+      boundary_mod: 0.75    # Getting eye in
+      wicket_mod: 1.00      # No penalty - playing carefully
+      dot_mod: 1.10
+      single_mod: 1.00
+    settling:
+      boundary_mod: 0.90
+      wicket_mod: 1.00
+      dot_mod: 1.05
+      single_mod: 1.00
+    set:
+      boundary_mod: 1.00    # Full confidence
+      wicket_mod: 1.00
+      dot_mod: 1.00
+      single_mod: 1.00
+
+# ============================================
+# PRESSURE/MOMENTUM MODIFIERS
+# ============================================
+# Context-based adjustments
+pressure:
+  # Recent wickets - batters consolidate
+  recent_wickets:
+    2:
+      boundary_mod: 0.95
+      dot_mod: 1.02
+    3:
+      boundary_mod: 0.90
+      dot_mod: 1.05
+
+  # Bowler on a roll
+  bowler_on_roll:
+    2_wickets:
+      boundary_mod: 0.96
+    3_wickets:
+      boundary_mod: 0.92
+
+  # Partnership builds confidence
+  partnership:
+    30_runs:
+      boundary_mod: 1.04
+      wicket_mod: 0.96    # Set batters safer
+    50_runs:
+      boundary_mod: 1.08
+      wicket_mod: 0.92
+
+  # High required rate forces risks
+  required_rate:
+    9_to_12:
+      boundary_mod: 1.15
+      wicket_mod: 1.20
+    over_12:
+      boundary_mod: 1.30
+      wicket_mod: 1.40
+
+# ============================================
+# SKILL IMPACT
+# ============================================
+# How player skills affect outcomes
+# Values are per 10 skill points above 60 baseline
+skill_impact:
+  batting:
+    technique:
+      boundary: 0.02
+      wicket: -0.01
+    power:
+      six: 0.03
+      four: 0.01
+    timing:
+      four: 0.02
+      single: 0.01
+    temperament:
+      wicket: -0.02
+
+  bowling:
+    speed:
+      wicket: 0.015
+      boundary: 0.01      # Pace is double-edged
+    accuracy:
+      dot: 0.02
+      wicket: 0.01
+      boundary: -0.02
+    variation:
+      wicket: 0.02
+      boundary: -0.01
+    stamina:
+      fatigue_resistance: 0.02
+
+# ============================================
+# PITCH EFFECTS
+# ============================================
+# Per 10 points above 50 baseline
+pitch:
+  pace:
+    fast_bowler_wicket: 0.02
+    boundary: 0.01
+  spin:
+    spin_bowler_wicket: 0.02
+    boundary: -0.01
+  bounce:
+    wicket_from_short: 0.015
+  deterioration:
+    second_innings_spin: 0.03
+
+# ============================================
+# DISMISSAL TYPE DISTRIBUTION
+# ============================================
+dismissals:
+  base:
+    caught: 0.35
+    bowled: 0.20
+    lbw: 0.15
+    runout: 0.15
+    stumped: 0.10
+    hitwicket: 0.05
+
+  # Adjustments by bowler type
+  fast_bowler:
+    caught: 0.40
+    bowled: 0.25
+    lbw: 0.18
+    runout: 0.12
+    stumped: 0.00
+    hitwicket: 0.05
+
+  spin_bowler:
+    caught: 0.30
+    bowled: 0.15
+    lbw: 0.15
+    runout: 0.10
+    stumped: 0.25
+    hitwicket: 0.05
+
+# ============================================
+# FIELDING IMPACT
+# ============================================
+fielding:
+  baseline: 60    # Average skill level
+  boundary_save:
+    max_chance: 0.30    # Maximum save probability
+    athleticism_weight: 0.7
+    ground_weight: 0.3
+  catch_conversion:
+    baseline: 0.85    # 85% catch success
+    skill_impact: 0.002    # Per point above baseline
+  runout:
+    baseline: 0.70
+    throwing_impact: 0.003
+
+# ============================================
+# EXTRAS
+# ============================================
+extras:
+  wide_chance: 0.02       # Per ball
+  noball_chance: 0.01     # Per ball
+  accuracy_impact: -0.0002    # Per accuracy point

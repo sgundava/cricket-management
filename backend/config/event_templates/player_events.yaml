@@ -1,0 +1,2025 @@
+# Player Events - 42 templates
+# Categories: playing time, form, contracts, injuries, personal, social media, dressing room, national duty, retirement, transfers
+
+templates:
+  # ============================================
+  # PLAYING TIME COMPLAINTS (5)
+  # ============================================
+  - id: player-playtime-unhappy
+    category: player
+    title: "Playing Time Concern"
+    description_template: "{player.name} has requested a meeting to discuss playing time. They feel underutilized and want assurance of more opportunities."
+    conditions:
+      - type: phase
+        phases: ["season"]
+      - type: game_context
+        attribute: match_day
+        operator: ge
+        value: 4
+    target_player_conditions:
+      - type: player_attribute
+        attribute: morale
+        operator: lt
+        value: 60
+    weight: 12
+    cooldown_days: 10
+    urgency: end-of-day
+    options:
+      - id: promise-chances
+        label: "Promise more opportunities"
+        description: "Assure them they're in your plans"
+        effects:
+          - target: player
+            attribute: morale
+            change: 15
+        risk_level: moderate
+        success_text: "The player seems satisfied with your reassurance."
+        failure_text: "The player remains skeptical but agrees to wait."
+        success_chance: 0.7
+      - id: explain-competition
+        label: "Explain the competition"
+        description: "Tell them they need to earn their spot"
+        effects:
+          - target: player
+            attribute: morale
+            change: -5
+          - target: player
+            attribute: form
+            change: 5
+        risk_level: risky
+        success_text: "The tough love motivates them to work harder."
+        failure_text: "They're disappointed but understand the message."
+        success_chance: 0.5
+      - id: consider-loan
+        label: "Suggest a loan move"
+        description: "Offer to find them regular cricket elsewhere"
+        effects:
+          - target: player
+            attribute: morale
+            change: 5
+        risk_level: safe
+        success_text: "They appreciate your honesty about their situation."
+
+  - id: player-playtime-frustrated
+    category: player
+    title: "Frustrated Benchwamer"
+    description_template: "{player.name} has been spotted looking frustrated during team huddles. The coaching staff are concerned about the impact on team morale."
+    conditions:
+      - type: phase
+        phases: ["season", "playoffs"]
+      - type: game_context
+        attribute: match_day
+        operator: ge
+        value: 6
+    target_player_conditions:
+      - type: player_attribute
+        attribute: morale
+        operator: lt
+        value: 50
+    weight: 8
+    cooldown_days: 14
+    urgency: this-week
+    options:
+      - id: heart-to-heart
+        label: "Have a heart-to-heart talk"
+        description: "Sit down and understand their perspective"
+        effects:
+          - target: player
+            attribute: morale
+            change: 20
+        risk_level: safe
+        success_text: "The conversation helps clear the air. They feel valued again."
+        success_chance: 0.85
+      - id: involve-captain
+        label: "Ask captain to talk to them"
+        description: "Let the leadership group handle it"
+        effects:
+          - target: player
+            attribute: morale
+            change: 10
+          - target: team
+            attribute: team_morale
+            change: 5
+        risk_level: moderate
+        success_text: "The captain's words resonate with the player."
+        success_chance: 0.7
+      - id: ignore-situation
+        label: "Ignore the situation"
+        description: "Focus on playing XI, they'll come around"
+        effects:
+          - target: player
+            attribute: morale
+            change: -15
+          - target: team
+            attribute: team_morale
+            change: -5
+        risk_level: risky
+        success_text: "They eventually accept their role."
+        failure_text: "The frustration festers and spreads to others."
+        success_chance: 0.3
+
+  - id: player-wants-captain-role
+    category: player
+    title: "Leadership Ambitions"
+    description_template: "{player.name} has privately expressed interest in taking on more leadership responsibility. They feel ready to lead."
+    conditions:
+      - type: phase
+        phases: ["season"]
+    target_player_conditions:
+      - type: player_attribute
+        attribute: morale
+        operator: ge
+        value: 70
+      - type: player_attribute
+        attribute: form
+        operator: ge
+        value: 0
+    weight: 6
+    cooldown_days: 30
+    urgency: this-week
+    options:
+      - id: vice-captain
+        label: "Offer vice-captaincy"
+        description: "Give them an official leadership role"
+        effects:
+          - target: player
+            attribute: morale
+            change: 25
+        risk_level: moderate
+        success_text: "They're thrilled with the new responsibility."
+      - id: leadership-group
+        label: "Include in leadership group"
+        description: "Make them part of decision-making without title"
+        effects:
+          - target: player
+            attribute: morale
+            change: 15
+        risk_level: safe
+        success_text: "They appreciate being consulted on team matters."
+      - id: not-yet
+        label: "Tell them it's not the right time"
+        description: "Explain they need more experience"
+        effects:
+          - target: player
+            attribute: morale
+            change: -10
+        risk_level: moderate
+        success_text: "They accept your reasoning, for now."
+        failure_text: "They're visibly disappointed."
+        success_chance: 0.6
+
+  - id: player-role-clarity
+    category: player
+    title: "Role Confusion"
+    description_template: "{player.name} seems unsure about their role in the team. They've asked for clarity on what you expect from them."
+    conditions:
+      - type: phase
+        phases: ["season"]
+    target_player_conditions:
+      - type: player_attribute
+        attribute: form
+        operator: lt
+        value: -2
+    weight: 10
+    cooldown_days: 14
+    urgency: end-of-day
+    options:
+      - id: define-role
+        label: "Clearly define their role"
+        description: "Explain exactly what you need from them"
+        effects:
+          - target: player
+            attribute: morale
+            change: 15
+          - target: player
+            attribute: form
+            change: 5
+        risk_level: safe
+        success_text: "With clarity comes confidence. They look more settled."
+      - id: flexible-role
+        label: "Tell them to be flexible"
+        description: "Explain they need to adapt to situations"
+        effects:
+          - target: player
+            attribute: morale
+            change: 5
+        risk_level: moderate
+        success_text: "They embrace the challenge of being versatile."
+        failure_text: "The uncertainty continues to affect them."
+        success_chance: 0.6
+
+  - id: player-dropped-reaction
+    category: player
+    title: "Dropped Player Reaction"
+    description_template: "{player.name} was visibly upset after being left out of the last match. They've requested an explanation."
+    conditions:
+      - type: phase
+        phases: ["season", "playoffs"]
+      - type: game_context
+        attribute: match_day
+        operator: ge
+        value: 2
+    target_player_conditions:
+      - type: player_attribute
+        attribute: morale
+        operator: lt
+        value: 55
+    weight: 10
+    cooldown_days: 7
+    urgency: immediate
+    options:
+      - id: honest-feedback
+        label: "Give honest feedback"
+        description: "Explain why they were dropped and what to improve"
+        effects:
+          - target: player
+            attribute: morale
+            change: 10
+          - target: player
+            attribute: form
+            change: 5
+        risk_level: moderate
+        success_text: "They appreciate your honesty and are motivated to improve."
+        failure_text: "They disagree with your assessment but accept it."
+        success_chance: 0.7
+      - id: tactical-decision
+        label: "Explain it was tactical"
+        description: "Frame it as opposition-specific, not performance-based"
+        effects:
+          - target: player
+            attribute: morale
+            change: 15
+        risk_level: safe
+        success_text: "They understand the tactical reasoning."
+      - id: stay-patient
+        label: "Tell them to stay patient"
+        description: "Assure them their time will come"
+        effects:
+          - target: player
+            attribute: morale
+            change: 5
+        risk_level: moderate
+        success_text: "They agree to bide their time."
+        failure_text: "Patience is wearing thin."
+        success_chance: 0.6
+
+  # ============================================
+  # FORM SLUMP (6)
+  # ============================================
+  - id: player-form-slump-confidence
+    category: player
+    title: "Confidence Crisis"
+    description_template: "{player.name} is going through a confidence crisis after a string of poor performances. They seem hesitant and unsure of themselves."
+    conditions:
+      - type: phase
+        phases: ["season"]
+    target_player_conditions:
+      - type: player_attribute
+        attribute: form
+        operator: lt
+        value: -3
+    weight: 12
+    cooldown_days: 10
+    urgency: end-of-day
+    options:
+      - id: back-publicly
+        label: "Back them publicly"
+        description: "Declare your faith in them to the media"
+        effects:
+          - target: player
+            attribute: morale
+            change: 20
+          - target: player
+            attribute: form
+            change: 3
+          - target: team
+            attribute: press_heat
+            change: 5
+        risk_level: moderate
+        success_text: "Your public backing boosts their confidence significantly."
+        failure_text: "The pressure of expectations adds to their burden."
+        success_chance: 0.7
+      - id: net-session
+        label: "Extra net sessions"
+        description: "Work on their technique one-on-one"
+        effects:
+          - target: player
+            attribute: form
+            change: 5
+          - target: player
+            attribute: fatigue
+            change: 10
+        risk_level: safe
+        success_text: "The practice sessions help them find rhythm."
+      - id: mental-break
+        label: "Give them a mental break"
+        description: "Rest them for a game to clear their head"
+        effects:
+          - target: player
+            attribute: morale
+            change: 10
+          - target: player
+            attribute: form
+            change: 2
+        risk_level: safe
+        success_text: "The break helps them reset mentally."
+
+  - id: player-form-technical
+    category: player
+    title: "Technical Issues"
+    description_template: "The coaching staff have identified technical flaws in {player.name}'s game that are causing their current struggles."
+    conditions:
+      - type: phase
+        phases: ["season"]
+    target_player_conditions:
+      - type: player_attribute
+        attribute: form
+        operator: lt
+        value: -2
+    weight: 8
+    cooldown_days: 14
+    urgency: this-week
+    options:
+      - id: video-analysis
+        label: "Intensive video analysis"
+        description: "Work with analysts to fix the issues"
+        effects:
+          - target: player
+            attribute: form
+            change: 7
+        risk_level: safe
+        success_text: "The video work helps identify and fix the problem."
+      - id: specialist-coach
+        label: "Bring in a specialist coach"
+        description: "External expert to work on specific skills"
+        effects:
+          - target: player
+            attribute: form
+            change: 10
+          - target: team
+            attribute: budget
+            change: -5
+        risk_level: moderate
+        success_text: "The specialist's fresh perspective makes a difference."
+      - id: back-to-basics
+        label: "Back to basics"
+        description: "Simplify their approach, focus on fundamentals"
+        effects:
+          - target: player
+            attribute: form
+            change: 5
+        risk_level: safe
+        success_text: "Stripping things back helps them rediscover their game."
+
+  - id: player-form-mental-block
+    category: player
+    title: "Mental Block"
+    description_template: "{player.name} seems to have developed a mental block when facing certain situations. They freeze under pressure."
+    conditions:
+      - type: phase
+        phases: ["season", "playoffs"]
+    target_player_conditions:
+      - type: player_attribute
+        attribute: form
+        operator: lt
+        value: -4
+    weight: 6
+    cooldown_days: 21
+    urgency: this-week
+    options:
+      - id: sports-psychologist
+        label: "Arrange sports psychologist"
+        description: "Professional mental coaching sessions"
+        effects:
+          - target: player
+            attribute: form
+            change: 8
+          - target: player
+            attribute: morale
+            change: 10
+        risk_level: safe
+        success_text: "The mental work helps them overcome the block."
+      - id: pressure-situation-training
+        label: "Simulate pressure in training"
+        description: "Create match-like scenarios in practice"
+        effects:
+          - target: player
+            attribute: form
+            change: 5
+        risk_level: moderate
+        success_text: "Gradually they become more comfortable under pressure."
+        failure_text: "The training adds to their anxiety."
+        success_chance: 0.65
+      - id: reduce-responsibility
+        label: "Reduce responsibility temporarily"
+        description: "Take pressure off by changing their role"
+        effects:
+          - target: player
+            attribute: morale
+            change: -5
+          - target: player
+            attribute: form
+            change: 5
+        risk_level: moderate
+        success_text: "With less pressure, they start to relax and perform."
+
+  - id: player-form-external-factors
+    category: player
+    title: "Off-Field Distractions"
+    description_template: "There are rumours that {player.name} is dealing with personal issues off the field that may be affecting their performance."
+    conditions:
+      - type: phase
+        phases: ["season"]
+    target_player_conditions:
+      - type: player_attribute
+        attribute: form
+        operator: lt
+        value: -2
+      - type: player_attribute
+        attribute: morale
+        operator: lt
+        value: 60
+    weight: 6
+    cooldown_days: 21
+    urgency: this-week
+    options:
+      - id: offer-support
+        label: "Offer personal support"
+        description: "Make team resources available to help"
+        effects:
+          - target: player
+            attribute: morale
+            change: 20
+          - target: player
+            attribute: form
+            change: 3
+        risk_level: safe
+        success_text: "They appreciate your concern and support."
+      - id: compassionate-leave
+        label: "Offer compassionate leave"
+        description: "Allow them time off to sort things out"
+        effects:
+          - target: player
+            attribute: morale
+            change: 25
+        risk_level: safe
+        success_text: "The time away helps them resolve their issues."
+      - id: professional-boundary
+        label: "Maintain professional boundary"
+        description: "Keep focus on cricket, don't get involved"
+        effects:
+          - target: player
+            attribute: morale
+            change: -5
+        risk_level: moderate
+        success_text: "They respect your boundaries and try to separate cricket from personal life."
+        failure_text: "They feel unsupported by the management."
+        success_chance: 0.5
+
+  - id: player-form-comeback
+    category: player
+    title: "Signs of Comeback"
+    description_template: "{player.name} showed glimpses of their best form in the nets today. The coaching staff are optimistic about their return to form."
+    conditions:
+      - type: phase
+        phases: ["season"]
+    target_player_conditions:
+      - type: player_attribute
+        attribute: form
+        operator: lt
+        value: 0
+      - type: player_attribute
+        attribute: form
+        operator: gt
+        value: -5
+    weight: 8
+    cooldown_days: 10
+    urgency: end-of-day
+    options:
+      - id: promote-immediately
+        label: "Fast-track them back"
+        description: "Give them an immediate chance in the XI"
+        effects:
+          - target: player
+            attribute: morale
+            change: 20
+          - target: player
+            attribute: form
+            change: 5
+        risk_level: risky
+        success_text: "The show of faith pays off - they deliver!"
+        failure_text: "Perhaps it was too soon. The pressure proves too much."
+        success_chance: 0.5
+      - id: gradual-return
+        label: "Gradual reintroduction"
+        description: "Build them up slowly with more practice"
+        effects:
+          - target: player
+            attribute: form
+            change: 5
+        risk_level: safe
+        success_text: "The patient approach helps them rebuild confidence."
+      - id: set-targets
+        label: "Set specific targets"
+        description: "Give them clear goals to achieve before selection"
+        effects:
+          - target: player
+            attribute: form
+            change: 3
+          - target: player
+            attribute: morale
+            change: 5
+        risk_level: safe
+        success_text: "The clarity of goals focuses their efforts."
+
+  - id: player-senior-form-slump
+    category: player
+    title: "Senior Player Struggles"
+    description_template: "{player.name}, one of your senior players, is going through a difficult patch. The dressing room is watching how you handle this."
+    conditions:
+      - type: phase
+        phases: ["season"]
+    target_player_conditions:
+      - type: player_attribute
+        attribute: form
+        operator: lt
+        value: -3
+    weight: 8
+    cooldown_days: 14
+    urgency: end-of-day
+    options:
+      - id: unwavering-support
+        label: "Show unwavering support"
+        description: "Back them unconditionally as a senior figure"
+        effects:
+          - target: player
+            attribute: morale
+            change: 20
+          - target: team
+            attribute: team_morale
+            change: 10
+        risk_level: moderate
+        success_text: "The dressing room appreciates how you treat senior players."
+        failure_text: "Some wonder if sentiment is overriding team needs."
+        success_chance: 0.7
+      - id: honest-conversation
+        label: "Have an honest conversation"
+        description: "Discuss their role going forward frankly"
+        effects:
+          - target: player
+            attribute: morale
+            change: 5
+          - target: player
+            attribute: form
+            change: 3
+        risk_level: moderate
+        success_text: "They respect your honesty and recommit to improvement."
+      - id: reduced-role
+        label: "Propose a reduced role"
+        description: "Suggest they focus on specific situations"
+        effects:
+          - target: player
+            attribute: morale
+            change: -10
+        risk_level: risky
+        success_text: "They accept the reduced role with grace."
+        failure_text: "They feel disrespected and sidelined."
+        success_chance: 0.4
+
+  # ============================================
+  # CONTRACT NEGOTIATIONS (5)
+  # ============================================
+  - id: player-contract-extension
+    category: player
+    title: "Contract Extension Request"
+    description_template: "{player.name}'s agent has approached the management about a contract extension. They want improved terms."
+    conditions:
+      - type: phase
+        phases: ["season", "off-season"]
+    target_player_conditions:
+      - type: player_attribute
+        attribute: contract_years
+        operator: le
+        value: 1
+      - type: player_attribute
+        attribute: form
+        operator: ge
+        value: 0
+    weight: 10
+    cooldown_days: 30
+    urgency: this-week
+    options:
+      - id: agree-extension
+        label: "Agree to extension"
+        description: "Lock them in for the long term"
+        effects:
+          - target: player
+            attribute: morale
+            change: 25
+        risk_level: safe
+        success_text: "Contract extended! The player is committed to the project."
+      - id: negotiate-terms
+        label: "Negotiate the terms"
+        description: "Try to get a better deal for the franchise"
+        effects:
+          - target: player
+            attribute: morale
+            change: 5
+        risk_level: moderate
+        success_text: "You reach a mutually beneficial agreement."
+        failure_text: "Negotiations stall - they'll revisit later."
+        success_chance: 0.6
+      - id: decline-now
+        label: "Decline for now"
+        description: "Wait and see how they perform"
+        effects:
+          - target: player
+            attribute: morale
+            change: -15
+        risk_level: risky
+        success_text: "They understand the need to prove themselves."
+        failure_text: "They're unsettled and may look elsewhere."
+        success_chance: 0.4
+
+  - id: player-contract-unhappy
+    category: player
+    title: "Contract Dispute"
+    description_template: "{player.name} feels undervalued compared to teammates and is demanding improved terms mid-contract."
+    conditions:
+      - type: phase
+        phases: ["season"]
+    target_player_conditions:
+      - type: player_attribute
+        attribute: morale
+        operator: lt
+        value: 55
+      - type: player_attribute
+        attribute: form
+        operator: ge
+        value: 2
+    weight: 6
+    cooldown_days: 30
+    urgency: this-week
+    options:
+      - id: improve-terms
+        label: "Improve their contract"
+        description: "Give them a raise to keep them happy"
+        effects:
+          - target: player
+            attribute: morale
+            change: 25
+          - target: team
+            attribute: budget
+            change: -10
+        risk_level: moderate
+        success_text: "They're satisfied with the improved terms."
+      - id: hold-firm
+        label: "Hold firm on contract"
+        description: "A deal is a deal - they signed it"
+        effects:
+          - target: player
+            attribute: morale
+            change: -15
+        risk_level: risky
+        success_text: "They grudgingly accept but are unhappy."
+        failure_text: "Relations become strained."
+        success_chance: 0.5
+      - id: non-monetary-perks
+        label: "Offer non-monetary perks"
+        description: "Leadership role, better facilities, etc."
+        effects:
+          - target: player
+            attribute: morale
+            change: 15
+        risk_level: safe
+        success_text: "The additional perks make them feel valued."
+
+  - id: player-contract-loyalty-bonus
+    category: player
+    title: "Loyalty Recognition"
+    description_template: "{player.name} has been with the franchise for several seasons. They've asked if their loyalty can be recognized with a bonus."
+    conditions:
+      - type: phase
+        phases: ["off-season", "pre-season"]
+    target_player_conditions:
+      - type: player_attribute
+        attribute: morale
+        operator: ge
+        value: 60
+    weight: 5
+    cooldown_days: 60
+    urgency: this-week
+    options:
+      - id: grant-bonus
+        label: "Grant loyalty bonus"
+        description: "Reward their commitment to the franchise"
+        effects:
+          - target: player
+            attribute: morale
+            change: 20
+          - target: team
+            attribute: team_morale
+            change: 5
+        risk_level: safe
+        success_text: "They appreciate the recognition of their loyalty."
+      - id: future-promise
+        label: "Promise future recognition"
+        description: "Commit to rewarding them when budget allows"
+        effects:
+          - target: player
+            attribute: morale
+            change: 5
+        risk_level: moderate
+        success_text: "They're patient but expect you to follow through."
+      - id: decline-request
+        label: "Decline the request"
+        description: "Explain budget constraints"
+        effects:
+          - target: player
+            attribute: morale
+            change: -10
+        risk_level: moderate
+        success_text: "They understand the financial situation."
+        failure_text: "They feel undervalued and taken for granted."
+        success_chance: 0.5
+
+  - id: player-release-request
+    category: player
+    title: "Release Request"
+    description_template: "{player.name} has formally requested to be released from their contract. They want to pursue opportunities elsewhere."
+    conditions:
+      - type: phase
+        phases: ["season", "off-season"]
+    target_player_conditions:
+      - type: player_attribute
+        attribute: morale
+        operator: lt
+        value: 40
+    weight: 4
+    cooldown_days: 60
+    urgency: immediate
+    options:
+      - id: grant-release
+        label: "Grant the release"
+        description: "Wish them well and let them go"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: -5
+        risk_level: safe
+        success_text: "You part ways amicably. They thank you for understanding."
+      - id: convince-stay
+        label: "Convince them to stay"
+        description: "Promise changes to address their concerns"
+        effects:
+          - target: player
+            attribute: morale
+            change: 20
+        risk_level: moderate
+        success_text: "They agree to give it another chance."
+        failure_text: "They're determined to leave."
+        success_chance: 0.4
+      - id: refuse-release
+        label: "Refuse the release"
+        description: "Hold them to their contract"
+        effects:
+          - target: player
+            attribute: morale
+            change: -25
+          - target: team
+            attribute: team_morale
+            change: -10
+        risk_level: risky
+        success_text: "They stay but are clearly unhappy."
+
+  - id: player-contract-offers
+    category: player
+    title: "Outside Interest"
+    description_template: "There are reports that other franchises are interested in {player.name} and are preparing offers for the next auction."
+    conditions:
+      - type: phase
+        phases: ["season"]
+    target_player_conditions:
+      - type: player_attribute
+        attribute: contract_years
+        operator: le
+        value: 1
+    weight: 8
+    cooldown_days: 30
+    urgency: this-week
+    options:
+      - id: express-intent
+        label: "Express intent to retain"
+        description: "Make clear they're in your long-term plans"
+        effects:
+          - target: player
+            attribute: morale
+            change: 15
+        risk_level: safe
+        success_text: "They're pleased to hear they're valued."
+      - id: wait-and-see
+        label: "Wait and see"
+        description: "Don't commit either way"
+        effects:
+          - target: player
+            attribute: morale
+            change: -5
+        risk_level: moderate
+        success_text: "They understand it's business."
+        failure_text: "The uncertainty bothers them."
+        success_chance: 0.6
+      - id: wish-them-luck
+        label: "Wish them luck"
+        description: "Indicate you won't be retaining them"
+        effects:
+          - target: player
+            attribute: morale
+            change: -20
+        risk_level: moderate
+        success_text: "They appreciate the honesty."
+        failure_text: "They feel betrayed and check out mentally."
+        success_chance: 0.5
+
+  # ============================================
+  # INJURY CONCERNS (4)
+  # ============================================
+  - id: player-injury-minor
+    category: player
+    title: "Minor Injury Concern"
+    description_template: "{player.name} has reported minor discomfort after training. The physio recommends caution."
+    conditions:
+      - type: phase
+        phases: ["season", "playoffs"]
+    target_player_conditions:
+      - type: player_attribute
+        attribute: form
+        operator: ge
+        value: 0
+    weight: 10
+    cooldown_days: 7
+    urgency: immediate
+    options:
+      - id: rest-precaution
+        label: "Rest as precaution"
+        description: "Skip next match to be safe"
+        effects:
+          - target: player
+            attribute: fitness
+            change: 10
+        risk_level: safe
+        success_text: "Rest helps them recover fully."
+      - id: play-through
+        label: "Let them play through it"
+        description: "Trust them to know their body"
+        effects:
+          - target: player
+            attribute: fitness
+            change: -10
+        risk_level: risky
+        success_text: "They manage the discomfort and perform well."
+        failure_text: "The injury worsens. They'll miss multiple games."
+        success_chance: 0.6
+      - id: reduced-workload
+        label: "Play with reduced workload"
+        description: "Use them sparingly - limited overs/time at crease"
+        effects:
+          - target: player
+            attribute: fitness
+            change: 0
+        risk_level: moderate
+        success_text: "The managed approach keeps them available without risk."
+
+  - id: player-injury-recurring
+    category: player
+    title: "Recurring Injury Issue"
+    description_template: "The medical staff are concerned that {player.name}'s injury is becoming a recurring problem. They recommend an extended rest period."
+    conditions:
+      - type: phase
+        phases: ["season"]
+    target_player_conditions: []
+    weight: 5
+    cooldown_days: 30
+    urgency: this-week
+    options:
+      - id: extended-rest
+        label: "Grant extended rest"
+        description: "Prioritize long-term health"
+        effects:
+          - target: player
+            attribute: morale
+            change: 10
+          - target: player
+            attribute: fitness
+            change: 20
+        risk_level: safe
+        success_text: "The rest helps them recover properly."
+      - id: specialist-treatment
+        label: "Seek specialist treatment"
+        description: "Send them for expert medical opinion"
+        effects:
+          - target: player
+            attribute: fitness
+            change: 15
+        risk_level: moderate
+        success_text: "The specialist identifies the root cause."
+      - id: manage-carefully
+        label: "Manage carefully this season"
+        description: "Use them selectively when needed most"
+        effects:
+          - target: player
+            attribute: fitness
+            change: -5
+        risk_level: risky
+        success_text: "Careful management keeps them available for key games."
+        failure_text: "The injury flares up at the worst possible time."
+        success_chance: 0.5
+
+  - id: player-injury-rushed-return
+    category: player
+    title: "Rush Return Request"
+    description_template: "{player.name} is eager to return from injury ahead of medical advice. They insist they're ready."
+    conditions:
+      - type: phase
+        phases: ["season", "playoffs"]
+    target_player_conditions: []
+    weight: 6
+    cooldown_days: 14
+    urgency: immediate
+    options:
+      - id: trust-player
+        label: "Trust the player"
+        description: "Let them return if they feel ready"
+        effects:
+          - target: player
+            attribute: morale
+            change: 15
+          - target: player
+            attribute: fitness
+            change: -15
+        risk_level: risky
+        success_text: "Their determination pays off - no setbacks."
+        failure_text: "They break down again. The early return was a mistake."
+        success_chance: 0.4
+      - id: follow-medical
+        label: "Follow medical advice"
+        description: "Insist they complete the recommended recovery time"
+        effects:
+          - target: player
+            attribute: morale
+            change: -10
+          - target: player
+            attribute: fitness
+            change: 10
+        risk_level: safe
+        success_text: "Frustrating but sensible. They return fully fit."
+      - id: compromise
+        label: "Compromise on timeline"
+        description: "Return slightly early but with managed workload"
+        effects:
+          - target: player
+            attribute: morale
+            change: 5
+          - target: player
+            attribute: fitness
+            change: -5
+        risk_level: moderate
+        success_text: "The middle ground works out well."
+        failure_text: "Perhaps you should have waited longer."
+        success_chance: 0.6
+
+  - id: player-injury-prevention
+    category: player
+    title: "Injury Prevention Concern"
+    description_template: "The fitness staff have flagged {player.name} as high risk for injury due to workload. They recommend action."
+    conditions:
+      - type: phase
+        phases: ["season"]
+    target_player_conditions:
+      - type: player_attribute
+        attribute: fatigue
+        operator: gt
+        value: 70
+    weight: 8
+    cooldown_days: 14
+    urgency: end-of-day
+    options:
+      - id: mandatory-rest
+        label: "Enforce mandatory rest"
+        description: "Force them to sit out and recover"
+        effects:
+          - target: player
+            attribute: fatigue
+            change: -30
+          - target: player
+            attribute: morale
+            change: -5
+        risk_level: safe
+        success_text: "The enforced break rejuvenates them."
+      - id: modified-training
+        label: "Modified training program"
+        description: "Lighter workload while keeping them match-ready"
+        effects:
+          - target: player
+            attribute: fatigue
+            change: -15
+        risk_level: moderate
+        success_text: "The adjusted program helps manage their workload."
+      - id: trust-player
+        label: "Trust the player's body"
+        description: "Let them judge their own fitness"
+        effects:
+          - target: player
+            attribute: fatigue
+            change: 10
+        risk_level: risky
+        success_text: "They manage their body well."
+        failure_text: "The workload catches up - they pick up a strain."
+        success_chance: 0.4
+
+  # ============================================
+  # SOCIAL MEDIA DRAMA (5)
+  # ============================================
+  - id: player-social-controversial
+    category: player
+    title: "Controversial Social Media Post"
+    description_template: "{player.name} has posted something controversial on social media. It's trending and attracting criticism."
+    conditions:
+      - type: phase
+        phases: ["season"]
+    target_player_conditions: []
+    weight: 6
+    cooldown_days: 21
+    urgency: immediate
+    options:
+      - id: delete-apologize
+        label: "Make them delete and apologize"
+        description: "Damage control - public apology"
+        effects:
+          - target: player
+            attribute: morale
+            change: -10
+          - target: team
+            attribute: press_heat
+            change: -10
+        risk_level: safe
+        success_text: "The apology is accepted. The story fades."
+      - id: support-player
+        label: "Support their right to opinion"
+        description: "Back their freedom of expression"
+        effects:
+          - target: player
+            attribute: morale
+            change: 15
+          - target: team
+            attribute: press_heat
+            change: 20
+        risk_level: risky
+        success_text: "Some praise your stance on free speech."
+        failure_text: "Sponsors are concerned. The controversy grows."
+        success_chance: 0.4
+      - id: stay-silent
+        label: "No comment"
+        description: "Wait for the news cycle to move on"
+        effects:
+          - target: team
+            attribute: press_heat
+            change: 10
+        risk_level: moderate
+        success_text: "The story loses steam. It blows over."
+        failure_text: "Your silence is criticized. The story lingers."
+        success_chance: 0.6
+
+  - id: player-social-feud
+    category: player
+    title: "Social Media Feud"
+    description_template: "{player.name} has got into a public spat with a former teammate on social media. It's making headlines."
+    conditions:
+      - type: phase
+        phases: ["season"]
+    target_player_conditions: []
+    weight: 5
+    cooldown_days: 30
+    urgency: immediate
+    options:
+      - id: mediate
+        label: "Mediate privately"
+        description: "Arrange for the parties to resolve it privately"
+        effects:
+          - target: team
+            attribute: press_heat
+            change: -5
+        risk_level: safe
+        success_text: "The situation is resolved behind closed doors."
+      - id: warning
+        label: "Issue a warning"
+        description: "Remind them about conduct policies"
+        effects:
+          - target: player
+            attribute: morale
+            change: -10
+          - target: team
+            attribute: press_heat
+            change: -10
+        risk_level: moderate
+        success_text: "They back down and delete the posts."
+      - id: let-play-out
+        label: "Let it play out"
+        description: "It's not the franchise's business"
+        effects:
+          - target: team
+            attribute: press_heat
+            change: 15
+        risk_level: risky
+        success_text: "It fizzles out on its own."
+        failure_text: "The drama escalates and becomes a distraction."
+        success_chance: 0.4
+
+  - id: player-social-leaked-dm
+    category: player
+    title: "Leaked Private Messages"
+    description_template: "Private messages from {player.name} have been leaked online. The content is embarrassing but not serious."
+    conditions:
+      - type: phase
+        phases: ["season"]
+    target_player_conditions: []
+    weight: 4
+    cooldown_days: 30
+    urgency: immediate
+    options:
+      - id: support-privacy
+        label: "Defend their privacy"
+        description: "Issue statement condemning the leak"
+        effects:
+          - target: player
+            attribute: morale
+            change: 20
+          - target: team
+            attribute: team_morale
+            change: 5
+        risk_level: safe
+        success_text: "The team appreciates you standing up for player privacy."
+      - id: remind-caution
+        label: "Remind them to be careful"
+        description: "Use it as a teachable moment"
+        effects:
+          - target: player
+            attribute: morale
+            change: 5
+        risk_level: safe
+        success_text: "They appreciate the gentle reminder."
+      - id: distance-franchise
+        label: "Distance the franchise"
+        description: "Make clear this is a personal matter"
+        effects:
+          - target: player
+            attribute: morale
+            change: -15
+        risk_level: moderate
+        success_text: "The franchise stays out of it successfully."
+        failure_text: "They feel abandoned by the management."
+        success_chance: 0.5
+
+  - id: player-social-positive-viral
+    category: player
+    title: "Viral Positive Moment"
+    description_template: "{player.name} has gone viral for a heartwarming interaction with a fan. The franchise is getting positive publicity."
+    conditions:
+      - type: phase
+        phases: ["season"]
+    target_player_conditions:
+      - type: player_attribute
+        attribute: morale
+        operator: ge
+        value: 60
+    weight: 8
+    cooldown_days: 14
+    urgency: end-of-day
+    options:
+      - id: amplify
+        label: "Amplify the moment"
+        description: "Share it on franchise channels"
+        effects:
+          - target: player
+            attribute: morale
+            change: 15
+          - target: team
+            attribute: press_heat
+            change: -10
+        risk_level: safe
+        success_text: "Great PR for the franchise. The player is proud."
+      - id: personal-thanks
+        label: "Personally thank them"
+        description: "Recognize their positive impact privately"
+        effects:
+          - target: player
+            attribute: morale
+            change: 20
+        risk_level: safe
+        success_text: "They appreciate the private acknowledgment."
+      - id: team-recognition
+        label: "Highlight in team meeting"
+        description: "Set an example for the rest of the squad"
+        effects:
+          - target: player
+            attribute: morale
+            change: 15
+          - target: team
+            attribute: team_morale
+            change: 10
+        risk_level: safe
+        success_text: "The team is inspired by their teammate's actions."
+
+  - id: player-social-rant
+    category: player
+    title: "Social Media Rant"
+    description_template: "{player.name} has posted a cryptic rant on social media that many believe is directed at the franchise or teammates."
+    conditions:
+      - type: phase
+        phases: ["season"]
+    target_player_conditions:
+      - type: player_attribute
+        attribute: morale
+        operator: lt
+        value: 50
+    weight: 6
+    cooldown_days: 21
+    urgency: immediate
+    options:
+      - id: private-conversation
+        label: "Have a private conversation"
+        description: "Understand what's bothering them"
+        effects:
+          - target: player
+            attribute: morale
+            change: 15
+        risk_level: safe
+        success_text: "You get to the root of the issue and resolve it."
+      - id: public-statement
+        label: "Issue a public statement"
+        description: "Deny any issues and present a united front"
+        effects:
+          - target: team
+            attribute: press_heat
+            change: -5
+          - target: player
+            attribute: morale
+            change: -10
+        risk_level: moderate
+        success_text: "The public narrative is controlled."
+        failure_text: "The player feels their concerns are being dismissed."
+        success_chance: 0.5
+      - id: fine-player
+        label: "Fine the player"
+        description: "Enforce social media policy"
+        effects:
+          - target: player
+            attribute: morale
+            change: -20
+          - target: team
+            attribute: team_morale
+            change: -5
+        risk_level: risky
+        success_text: "A clear message is sent about acceptable conduct."
+        failure_text: "Other players feel the punishment was harsh."
+        success_chance: 0.4
+
+  # ============================================
+  # DRESSING ROOM DYNAMICS (6)
+  # ============================================
+  - id: player-dressing-room-clique
+    category: player
+    title: "Dressing Room Cliques"
+    description_template: "The coaching staff have noticed cliques forming in the dressing room. Some players are feeling left out."
+    conditions:
+      - type: phase
+        phases: ["season"]
+      - type: game_context
+        attribute: match_day
+        operator: ge
+        value: 5
+    target_player_conditions: []
+    weight: 7
+    cooldown_days: 21
+    urgency: this-week
+    options:
+      - id: team-bonding
+        label: "Organize team bonding"
+        description: "Activities to bring the group together"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 15
+        risk_level: safe
+        success_text: "The bonding session helps break down barriers."
+      - id: mix-groups
+        label: "Mix up training groups"
+        description: "Force players out of comfort zones"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 10
+        risk_level: moderate
+        success_text: "New friendships form across the squad."
+        failure_text: "Some players resist the changes."
+        success_chance: 0.7
+      - id: let-natural
+        label: "Let it develop naturally"
+        description: "Cliques are normal in any team"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: -5
+        risk_level: moderate
+        success_text: "Things settle down on their own."
+        failure_text: "The divisions deepen."
+        success_chance: 0.5
+
+  - id: player-dressing-room-tension
+    category: player
+    title: "Dressing Room Tension"
+    description_template: "There's been a heated argument between two players in the dressing room. The atmosphere is tense."
+    conditions:
+      - type: phase
+        phases: ["season"]
+    target_player_conditions: []
+    weight: 6
+    cooldown_days: 14
+    urgency: immediate
+    options:
+      - id: clear-air
+        label: "Clear-the-air meeting"
+        description: "Get both parties in a room to resolve it"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 10
+        risk_level: moderate
+        success_text: "They shake hands and move on."
+        failure_text: "The meeting makes things worse."
+        success_chance: 0.6
+      - id: separate-them
+        label: "Keep them separated"
+        description: "Different training groups, different hotel floors"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: -5
+        risk_level: moderate
+        success_text: "Time apart helps cool things down."
+      - id: captain-mediate
+        label: "Ask captain to mediate"
+        description: "Let the leadership group handle it"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 5
+        risk_level: safe
+        success_text: "The captain's intervention helps."
+
+  - id: player-dressing-room-positive
+    category: player
+    title: "Strong Team Spirit"
+    description_template: "The coaching staff report an excellent atmosphere in the dressing room. The players are really enjoying each other's company."
+    conditions:
+      - type: phase
+        phases: ["season"]
+      - type: streak
+        streak_type: winning
+        operator: ge
+        value: 2
+      - type: team_state
+        attribute: team_morale
+        operator: ge
+        value: 70
+    target_player_conditions: []
+    weight: 8
+    cooldown_days: 14
+    urgency: end-of-day
+    options:
+      - id: maintain
+        label: "Maintain what's working"
+        description: "Don't change anything"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 5
+        risk_level: safe
+        success_text: "The good vibes continue."
+      - id: reward-team
+        label: "Reward the team"
+        description: "Team dinner or outing"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 15
+        risk_level: safe
+        success_text: "The team enjoys the reward and bonds further."
+      - id: stay-focused
+        label: "Keep them focused"
+        description: "Remind them the job isn't done"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: -5
+        risk_level: moderate
+        success_text: "They appreciate the reminder to stay grounded."
+        failure_text: "The mood slightly dampens."
+        success_chance: 0.7
+
+  - id: player-newcomer-integration
+    category: player
+    title: "New Player Integration"
+    description_template: "{player.name}, a recent signing, is struggling to integrate with the group. They seem isolated."
+    conditions:
+      - type: phase
+        phases: ["season"]
+    target_player_conditions:
+      - type: player_attribute
+        attribute: morale
+        operator: lt
+        value: 60
+    weight: 7
+    cooldown_days: 14
+    urgency: this-week
+    options:
+      - id: assign-buddy
+        label: "Assign a buddy"
+        description: "Get a senior player to help them settle"
+        effects:
+          - target: player
+            attribute: morale
+            change: 20
+        risk_level: safe
+        success_text: "The buddy system works. They're fitting in better."
+      - id: special-role
+        label: "Give them a role"
+        description: "Make them feel valued with responsibility"
+        effects:
+          - target: player
+            attribute: morale
+            change: 15
+        risk_level: moderate
+        success_text: "The responsibility helps them feel part of the group."
+      - id: give-time
+        label: "Give them time"
+        description: "Some players take longer to settle"
+        effects:
+          - target: player
+            attribute: morale
+            change: 5
+        risk_level: moderate
+        success_text: "They gradually find their place."
+        failure_text: "They continue to struggle to fit in."
+        success_chance: 0.5
+
+  - id: player-senior-junior-rift
+    category: player
+    title: "Generational Divide"
+    description_template: "There's a growing divide between senior and junior players in the squad. Different expectations and attitudes are causing friction."
+    conditions:
+      - type: phase
+        phases: ["season"]
+      - type: game_context
+        attribute: match_day
+        operator: ge
+        value: 5
+    target_player_conditions: []
+    weight: 5
+    cooldown_days: 30
+    urgency: this-week
+    options:
+      - id: bridge-gap
+        label: "Bridge the gap"
+        description: "Pair seniors with juniors in activities"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 15
+        risk_level: safe
+        success_text: "The structured interactions help understanding."
+      - id: clear-expectations
+        label: "Set clear expectations"
+        description: "Establish standards everyone must follow"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 10
+        risk_level: moderate
+        success_text: "Clear guidelines help reduce friction."
+      - id: lean-on-seniors
+        label: "Empower seniors to lead"
+        description: "Trust them to set the example"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 5
+        risk_level: moderate
+        success_text: "The seniors rise to the responsibility."
+        failure_text: "Juniors feel their concerns aren't heard."
+        success_chance: 0.6
+
+  - id: player-captain-authority
+    category: player
+    title: "Captain's Authority Questioned"
+    description_template: "Some players have been openly questioning the captain's decisions. There's a power struggle brewing."
+    conditions:
+      - type: phase
+        phases: ["season"]
+      - type: streak
+        streak_type: losing
+        operator: ge
+        value: 2
+    target_player_conditions: []
+    weight: 5
+    cooldown_days: 21
+    urgency: immediate
+    options:
+      - id: back-captain
+        label: "Publicly back the captain"
+        description: "Make your support clear to all"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 10
+        risk_level: moderate
+        success_text: "Your backing strengthens the captain's position."
+        failure_text: "Dissenters feel ignored."
+        success_chance: 0.7
+      - id: address-concerns
+        label: "Address concerns privately"
+        description: "Listen to what players are saying"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 5
+        risk_level: safe
+        success_text: "Players feel heard. Tensions ease."
+      - id: leadership-review
+        label: "Review leadership structure"
+        description: "Consider if changes are needed"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: -10
+        risk_level: risky
+        success_text: "You identify improvements to make."
+        failure_text: "Uncertainty destabilizes the group further."
+        success_chance: 0.4
+
+  # ============================================
+  # NATIONAL DUTY (3)
+  # ============================================
+  - id: player-national-call
+    category: player
+    title: "International Call-Up"
+    description_template: "{player.name} has been called up for international duty. They'll miss a few matches but it's a huge opportunity."
+    conditions:
+      - type: phase
+        phases: ["season"]
+    target_player_conditions:
+      - type: player_attribute
+        attribute: form
+        operator: ge
+        value: 2
+    weight: 5
+    cooldown_days: 30
+    urgency: end-of-day
+    options:
+      - id: congratulate
+        label: "Congratulate warmly"
+        description: "Express genuine happiness for them"
+        effects:
+          - target: player
+            attribute: morale
+            change: 25
+        risk_level: safe
+        success_text: "They're thrilled by your support. It strengthens your relationship."
+      - id: discuss-return
+        label: "Discuss return plans"
+        description: "Make sure they return in good shape"
+        effects:
+          - target: player
+            attribute: morale
+            change: 15
+        risk_level: safe
+        success_text: "Clear plans are made for their return."
+      - id: manage-workload
+        label: "Request workload management"
+        description: "Ask national team to be careful with them"
+        effects:
+          - target: player
+            attribute: morale
+            change: 5
+          - target: player
+            attribute: fatigue
+            change: -10
+        risk_level: moderate
+        success_text: "The national team agrees to manage their workload."
+
+  - id: player-national-snub
+    category: player
+    title: "International Snub"
+    description_template: "{player.name} was left out of the national squad despite strong performances. They're devastated."
+    conditions:
+      - type: phase
+        phases: ["season"]
+    target_player_conditions:
+      - type: player_attribute
+        attribute: form
+        operator: ge
+        value: 3
+    weight: 5
+    cooldown_days: 30
+    urgency: end-of-day
+    options:
+      - id: console
+        label: "Console them"
+        description: "Offer words of encouragement"
+        effects:
+          - target: player
+            attribute: morale
+            change: 15
+        risk_level: safe
+        success_text: "Your support helps them cope with the disappointment."
+      - id: channel-frustration
+        label: "Channel their frustration"
+        description: "Turn the snub into motivation"
+        effects:
+          - target: player
+            attribute: morale
+            change: 10
+          - target: player
+            attribute: form
+            change: 5
+        risk_level: moderate
+        success_text: "They're fired up to prove the selectors wrong."
+      - id: perspective
+        label: "Offer perspective"
+        description: "Remind them of the bigger picture"
+        effects:
+          - target: player
+            attribute: morale
+            change: 5
+        risk_level: safe
+        success_text: "They take a step back and refocus on franchise cricket."
+
+  - id: player-national-burnout
+    category: player
+    title: "Post-International Fatigue"
+    description_template: "{player.name} has returned from international duty looking exhausted. The national team schedule has been demanding."
+    conditions:
+      - type: phase
+        phases: ["season"]
+    target_player_conditions:
+      - type: player_attribute
+        attribute: fatigue
+        operator: ge
+        value: 60
+    weight: 6
+    cooldown_days: 21
+    urgency: immediate
+    options:
+      - id: mandatory-rest
+        label: "Mandatory rest"
+        description: "Force them to take time off"
+        effects:
+          - target: player
+            attribute: fatigue
+            change: -30
+          - target: player
+            attribute: morale
+            change: 5
+        risk_level: safe
+        success_text: "The rest does them good. They return refreshed."
+      - id: light-duties
+        label: "Light duties"
+        description: "Gradual return to full fitness"
+        effects:
+          - target: player
+            attribute: fatigue
+            change: -15
+        risk_level: moderate
+        success_text: "The phased return works well."
+      - id: ask-preference
+        label: "Ask their preference"
+        description: "Let them decide if they need rest"
+        effects:
+          - target: player
+            attribute: morale
+            change: 10
+        risk_level: moderate
+        success_text: "They appreciate having input into their schedule."
+        failure_text: "They push themselves too hard."
+        success_chance: 0.6
+
+  # ============================================
+  # RETIREMENT & LEGACY (2)
+  # ============================================
+  - id: player-retirement-hint
+    category: player
+    title: "Retirement Thoughts"
+    description_template: "{player.name} has privately mentioned considering retirement at the end of the season. They want to discuss their future."
+    conditions:
+      - type: phase
+        phases: ["season", "off-season"]
+    target_player_conditions: []
+    weight: 3
+    cooldown_days: 60
+    urgency: this-week
+    options:
+      - id: encourage-continue
+        label: "Encourage them to continue"
+        description: "Tell them they still have a lot to offer"
+        effects:
+          - target: player
+            attribute: morale
+            change: 15
+        risk_level: moderate
+        success_text: "They decide to continue for at least one more season."
+        failure_text: "They appreciate the sentiment but their mind is made up."
+        success_chance: 0.5
+      - id: support-decision
+        label: "Support their decision"
+        description: "Respect their choice and offer support"
+        effects:
+          - target: player
+            attribute: morale
+            change: 20
+        risk_level: safe
+        success_text: "They appreciate your understanding and support."
+      - id: plan-farewell
+        label: "Discuss a fitting farewell"
+        description: "Make their final season special"
+        effects:
+          - target: player
+            attribute: morale
+            change: 25
+          - target: team
+            attribute: team_morale
+            change: 5
+        risk_level: safe
+        success_text: "They're touched by the thoughtful send-off plans."
+
+  - id: player-retirement-coaching
+    category: player
+    title: "Coaching Aspirations"
+    description_template: "{player.name} is thinking about life after playing and has expressed interest in coaching. They want to know if there's a future here."
+    conditions:
+      - type: phase
+        phases: ["off-season", "season"]
+    target_player_conditions: []
+    weight: 3
+    cooldown_days: 60
+    urgency: this-week
+    options:
+      - id: offer-role
+        label: "Offer a future role"
+        description: "Commit to a coaching position post-retirement"
+        effects:
+          - target: player
+            attribute: morale
+            change: 25
+        risk_level: safe
+        success_text: "They're thrilled at the prospect of staying with the franchise."
+      - id: exploratory-role
+        label: "Offer a transitional role"
+        description: "Start involving them in coaching while still playing"
+        effects:
+          - target: player
+            attribute: morale
+            change: 20
+        risk_level: safe
+        success_text: "They enjoy the new responsibilities."
+      - id: no-commitment
+        label: "Can't commit now"
+        description: "Too early to make promises"
+        effects:
+          - target: player
+            attribute: morale
+            change: -10
+        risk_level: moderate
+        success_text: "They understand the need for caution."
+        failure_text: "They feel let down after years of service."
+        success_chance: 0.5
+
+  # ============================================
+  # TRANSFER RUMORS (5)
+  # ============================================
+  - id: player-transfer-rumor-out
+    category: player
+    title: "Transfer Speculation"
+    description_template: "Media reports are linking {player.name} with a move to another franchise. The rumors are gaining traction."
+    conditions:
+      - type: phase
+        phases: ["season"]
+    target_player_conditions:
+      - type: player_attribute
+        attribute: form
+        operator: ge
+        value: 2
+    weight: 8
+    cooldown_days: 21
+    urgency: end-of-day
+    options:
+      - id: deny-rumors
+        label: "Publicly deny the rumors"
+        description: "Shut down speculation firmly"
+        effects:
+          - target: team
+            attribute: press_heat
+            change: -10
+        risk_level: safe
+        success_text: "The story dies down quickly."
+      - id: talk-to-player
+        label: "Talk to the player"
+        description: "Find out their thoughts"
+        effects:
+          - target: player
+            attribute: morale
+            change: 10
+        risk_level: safe
+        success_text: "They assure you they're committed to the franchise."
+      - id: no-comment
+        label: "No comment"
+        description: "Don't engage with speculation"
+        effects:
+          - target: team
+            attribute: press_heat
+            change: 5
+        risk_level: moderate
+        success_text: "The story eventually fades."
+        failure_text: "Your silence is interpreted as confirmation."
+        success_chance: 0.6
+
+  - id: player-transfer-target-in
+    category: player
+    title: "Incoming Transfer Target"
+    description_template: "There are reports that another franchise's star player is interested in joining your team. The dressing room is buzzing."
+    conditions:
+      - type: phase
+        phases: ["season", "off-season"]
+    target_player_conditions: []
+    weight: 5
+    cooldown_days: 30
+    urgency: this-week
+    options:
+      - id: pursue-interest
+        label: "Pursue the interest"
+        description: "Explore bringing them in"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 10
+        risk_level: moderate
+        success_text: "Players are excited about the potential addition."
+      - id: focus-on-squad
+        label: "Focus on current squad"
+        description: "Don't get distracted by transfer talk"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 5
+        risk_level: safe
+        success_text: "The squad appreciates your faith in them."
+      - id: assess-fit
+        label: "Assess the fit"
+        description: "Consider if they'd improve the squad balance"
+        effects: []
+        risk_level: safe
+        success_text: "You gather useful intelligence for future decisions."
+
+  - id: player-wants-stay
+    category: player
+    title: "Commitment Declaration"
+    description_template: "{player.name} has publicly declared their desire to stay with the franchise long-term, despite outside interest."
+    conditions:
+      - type: phase
+        phases: ["season"]
+    target_player_conditions:
+      - type: player_attribute
+        attribute: morale
+        operator: ge
+        value: 70
+    weight: 6
+    cooldown_days: 30
+    urgency: end-of-day
+    options:
+      - id: reciprocate
+        label: "Reciprocate publicly"
+        description: "Declare your commitment to them too"
+        effects:
+          - target: player
+            attribute: morale
+            change: 20
+          - target: team
+            attribute: team_morale
+            change: 5
+        risk_level: safe
+        success_text: "A mutual love-in that delights the fans."
+      - id: private-thanks
+        label: "Thank them privately"
+        description: "Acknowledge their loyalty personally"
+        effects:
+          - target: player
+            attribute: morale
+            change: 15
+        risk_level: safe
+        success_text: "They appreciate the personal touch."
+      - id: keep-options
+        label: "Keep your options open"
+        description: "Don't make promises you might not keep"
+        effects:
+          - target: player
+            attribute: morale
+            change: -5
+        risk_level: moderate
+        success_text: "They understand it's a business."
+        failure_text: "They feel their loyalty isn't reciprocated."
+        success_chance: 0.5
+
+  - id: player-rival-approach
+    category: player
+    title: "Rival Franchise Approach"
+    description_template: "{player.name}'s agent has informed you that a rival franchise has made an unofficial approach."
+    conditions:
+      - type: phase
+        phases: ["season"]
+    target_player_conditions: []
+    weight: 5
+    cooldown_days: 30
+    urgency: this-week
+    options:
+      - id: match-offer
+        label: "Match the offer"
+        description: "Don't let them be outbid"
+        effects:
+          - target: player
+            attribute: morale
+            change: 15
+        risk_level: moderate
+        success_text: "They're pleased you value them equally."
+      - id: exceed-offer
+        label: "Exceed the offer"
+        description: "Make them an offer they can't refuse"
+        effects:
+          - target: player
+            attribute: morale
+            change: 25
+        risk_level: moderate
+        success_text: "They're flattered and fully committed."
+      - id: let-decide
+        label: "Let them decide"
+        description: "Don't engage in a bidding war"
+        effects:
+          - target: player
+            attribute: morale
+            change: 5
+        risk_level: risky
+        success_text: "They choose to stay on their own terms."
+        failure_text: "They feel you don't value them enough to fight for them."
+        success_chance: 0.5
+
+  - id: player-homecoming-wish
+    category: player
+    title: "Homecoming Desire"
+    description_template: "{player.name} has expressed a desire to end their career at their hometown franchise. They want to discuss a move."
+    conditions:
+      - type: phase
+        phases: ["off-season"]
+    target_player_conditions: []
+    weight: 3
+    cooldown_days: 60
+    urgency: this-week
+    options:
+      - id: understand
+        label: "Understand and facilitate"
+        description: "Help make it happen if possible"
+        effects:
+          - target: player
+            attribute: morale
+            change: 25
+        risk_level: safe
+        success_text: "They're grateful for your understanding."
+      - id: convince-stay
+        label: "Try to convince them to stay"
+        description: "Make the case for their current home"
+        effects:
+          - target: player
+            attribute: morale
+            change: 10
+        risk_level: moderate
+        success_text: "They agree to consider staying."
+        failure_text: "Their heart is set on going home."
+        success_chance: 0.4
+      - id: respect-wish
+        label: "Respect their wish"
+        description: "Acknowledge their service and wish them well"
+        effects:
+          - target: player
+            attribute: morale
+            change: 20
+          - target: team
+            attribute: team_morale
+            change: 5
+        risk_level: safe
+        success_text: "A classy parting that earns respect all around."

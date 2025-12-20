@@ -1,0 +1,863 @@
+# Season Events - 18 templates
+# Categories: playoffs, milestones, rivalries, disruptions, celebrations
+
+templates:
+  # ============================================
+  # PLAYOFF SCENARIOS (4)
+  # ============================================
+  - id: season-playoff-clinched
+    category: season
+    title: "Playoff Qualification Secured"
+    description_template: "You've done it! The team has secured a playoff spot with {match_day} matches still remaining. Time to celebrate... or is it?"
+    conditions:
+      - type: phase
+        phases: ["season"]
+      - type: game_context
+        attribute: league_position
+        operator: le
+        value: 4
+      - type: game_context
+        attribute: match_day
+        operator: ge
+        value: 10
+    target_player_conditions: []
+    weight: 10
+    cooldown_days: 60
+    urgency: end-of-day
+    options:
+      - id: celebrate-achievement
+        label: "Celebrate the achievement"
+        description: "Acknowledge reaching playoffs with the squad"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 20
+        risk_level: safe
+        success_text: "The team celebrates a well-earned achievement."
+      - id: set-higher-goals
+        label: "Set higher goals immediately"
+        description: "No celebrations until we win the trophy"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 5
+        risk_level: moderate
+        success_text: "The team understands the job isn't done."
+        failure_text: "Some players feel the achievement was dismissed."
+        success_chance: 0.6
+      - id: rest-key-players
+        label: "Plan to rest key players"
+        description: "Rotate the squad with playoffs secured"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 10
+        risk_level: safe
+        success_text: "Smart squad management for the playoffs."
+
+  - id: season-playoff-fight
+    category: season
+    title: "Playoff Race Intensifies"
+    description_template: "It's going down to the wire. With {match_day} matches played, you're in a tight race for the final playoff spot."
+    conditions:
+      - type: phase
+        phases: ["season"]
+      - type: game_context
+        attribute: league_position
+        operator: ge
+        value: 3
+      - type: game_context
+        attribute: league_position
+        operator: le
+        value: 6
+      - type: game_context
+        attribute: match_day
+        operator: ge
+        value: 10
+    target_player_conditions: []
+    weight: 10
+    cooldown_days: 7
+    urgency: immediate
+    options:
+      - id: embrace-pressure
+        label: "Embrace the pressure"
+        description: "This is what elite sport is about"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 15
+        risk_level: safe
+        success_text: "The squad rises to the occasion."
+      - id: stay-calm
+        label: "Keep everyone calm"
+        description: "Control what we can control"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 10
+        risk_level: safe
+        success_text: "A calm approach steadies the nerves."
+      - id: rally-troops
+        label: "Rally the troops"
+        description: "Give a passionate team talk"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 20
+        risk_level: moderate
+        success_text: "The team is fired up for the challenge."
+        failure_text: "The added pressure affects some players negatively."
+        success_chance: 0.7
+
+  - id: season-elimination-looms
+    category: season
+    title: "Mathematical Elimination Approaching"
+    description_template: "The maths is grim. A few more losses and the playoff dream is over. The team needs to win out."
+    conditions:
+      - type: phase
+        phases: ["season"]
+      - type: game_context
+        attribute: league_position
+        operator: gt
+        value: 6
+      - type: game_context
+        attribute: match_day
+        operator: ge
+        value: 10
+    target_player_conditions: []
+    weight: 8
+    cooldown_days: 14
+    urgency: immediate
+    options:
+      - id: believe
+        label: "Maintain belief"
+        description: "We're not out until we're mathematically out"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 15
+        risk_level: safe
+        success_text: "The team clings to hope."
+      - id: realistic-goals
+        label: "Set realistic goals"
+        description: "Focus on finishing strong regardless"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 5
+        risk_level: moderate
+        success_text: "The team refocuses on pride in performance."
+      - id: play-youngsters
+        label: "Give youngsters a chance"
+        description: "Build for next season if this one is slipping away"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: -5
+          - target: team
+            attribute: board_patience
+            change: 10
+        risk_level: moderate
+        success_text: "Young players get valuable experience."
+        failure_text: "Senior players feel written off."
+        success_chance: 0.6
+
+  - id: season-final-day-drama
+    category: season
+    title: "Final Day Scenarios"
+    description_template: "It's the last league match. Other results could affect your playoff position. How do you handle the tension?"
+    conditions:
+      - type: phase
+        phases: ["season"]
+      - type: game_context
+        attribute: match_day
+        operator: ge
+        value: 14
+    target_player_conditions: []
+    weight: 10
+    cooldown_days: 60
+    urgency: immediate
+    options:
+      - id: focus-on-ourselves
+        label: "Focus on our match"
+        description: "Control what we can control"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 10
+        risk_level: safe
+        success_text: "The team blocks out external noise."
+      - id: scoreboard-watching
+        label: "Keep an eye on other scores"
+        description: "Know the scenarios as they unfold"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: -5
+        risk_level: risky
+        success_text: "The information helps with decision-making."
+        failure_text: "The distraction affects concentration."
+        success_chance: 0.4
+      - id: nothing-to-lose
+        label: "Play with freedom"
+        description: "Tell them to enjoy the moment"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 15
+        risk_level: safe
+        success_text: "The freedom leads to great performances."
+
+  # ============================================
+  # MILESTONES & RECORDS (5)
+  # ============================================
+  - id: season-milestone-hundred
+    category: season
+    title: "Century Milestone"
+    description_template: "{player.name} has scored a magnificent hundred! The dressing room is buzzing."
+    conditions:
+      - type: phase
+        phases: ["season", "playoffs"]
+    target_player_conditions:
+      - type: player_attribute
+        attribute: form
+        operator: ge
+        value: 3
+    weight: 8
+    cooldown_days: 14
+    urgency: end-of-day
+    options:
+      - id: public-praise
+        label: "Praise them publicly"
+        description: "Celebrate the achievement in media"
+        effects:
+          - target: player
+            attribute: morale
+            change: 20
+          - target: team
+            attribute: team_morale
+            change: 10
+        risk_level: safe
+        success_text: "The recognition delights the player and inspires teammates."
+      - id: team-celebration
+        label: "Team celebration"
+        description: "Make it a team moment"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 15
+        risk_level: safe
+        success_text: "The team enjoys celebrating together."
+      - id: keep-grounded
+        label: "Keep them grounded"
+        description: "Nice innings, but focus on the next game"
+        effects:
+          - target: player
+            attribute: morale
+            change: 5
+        risk_level: moderate
+        success_text: "They stay focused on team goals."
+        failure_text: "They feel their achievement was dismissed."
+        success_chance: 0.6
+
+  - id: season-milestone-fifer
+    category: season
+    title: "Five-Wicket Haul"
+    description_template: "{player.name} has taken a remarkable 5-wicket haul! Match-winning bowling performance."
+    conditions:
+      - type: phase
+        phases: ["season", "playoffs"]
+    target_player_conditions:
+      - type: player_attribute
+        attribute: form
+        operator: ge
+        value: 3
+    weight: 6
+    cooldown_days: 21
+    urgency: end-of-day
+    options:
+      - id: match-ball
+        label: "Present the match ball"
+        description: "A traditional recognition of bowling greatness"
+        effects:
+          - target: player
+            attribute: morale
+            change: 25
+        risk_level: safe
+        success_text: "A proud moment for the bowler."
+      - id: analyze-spell
+        label: "Analyze the spell with team"
+        description: "Use it as a coaching moment"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 10
+        risk_level: safe
+        success_text: "The team learns from the performance."
+      - id: modest-acknowledgment
+        label: "Modest acknowledgment"
+        description: "Well done, now onto the next challenge"
+        effects:
+          - target: player
+            attribute: morale
+            change: 10
+        risk_level: safe
+        success_text: "They appreciate the low-key recognition."
+
+  - id: season-record-chase
+    category: season
+    title: "Record Run Chase"
+    description_template: "The team has just completed a record-breaking run chase! The highest successful chase in the tournament's history."
+    conditions:
+      - type: phase
+        phases: ["season"]
+      - type: streak
+        streak_type: winning
+        operator: ge
+        value: 1
+    target_player_conditions: []
+    weight: 4
+    cooldown_days: 60
+    urgency: immediate
+    options:
+      - id: celebrate-achievement
+        label: "Celebrate the record"
+        description: "This is history!"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 25
+          - target: team
+            attribute: press_heat
+            change: -15
+        risk_level: safe
+        success_text: "A memorable achievement for the franchise."
+      - id: focus-on-win
+        label: "Focus on the win"
+        description: "Records are nice, points are nicer"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 15
+        risk_level: safe
+        success_text: "The team stays focused on the bigger picture."
+      - id: media-moment
+        label: "Create a media moment"
+        description: "Use it for positive franchise publicity"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 15
+          - target: team
+            attribute: press_heat
+            change: -20
+        risk_level: safe
+        success_text: "Great PR for the franchise."
+
+  - id: season-losing-streak-record
+    category: season
+    title: "Unwanted Record"
+    description_template: "The team is approaching an unwanted record - the longest losing streak in franchise history."
+    conditions:
+      - type: phase
+        phases: ["season"]
+      - type: streak
+        streak_type: losing
+        operator: ge
+        value: 5
+    target_player_conditions: []
+    weight: 10
+    cooldown_days: 14
+    urgency: immediate
+    options:
+      - id: galvanize-squad
+        label: "Galvanize the squad"
+        description: "Use it as motivation to turn things around"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 10
+        risk_level: safe
+        success_text: "The team is determined to avoid the ignominy."
+      - id: change-approach
+        label: "Make significant changes"
+        description: "Shake things up - nothing to lose now"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 5
+        risk_level: risky
+        success_text: "Fresh faces bring new energy."
+        failure_text: "The changes cause more instability."
+        success_chance: 0.5
+      - id: stay-course
+        label: "Stay the course"
+        description: "Stick with your plan and trust the process"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: -5
+        risk_level: moderate
+        success_text: "Patience eventually pays off."
+        failure_text: "The same approach yields the same results."
+        success_chance: 0.4
+
+  - id: season-unbeaten-run
+    category: season
+    title: "Unbeaten Streak Growing"
+    description_template: "The team hasn't lost in {streak} matches! Can you keep the remarkable run going?"
+    conditions:
+      - type: phase
+        phases: ["season"]
+      - type: streak
+        streak_type: winning
+        operator: ge
+        value: 5
+    target_player_conditions: []
+    weight: 8
+    cooldown_days: 7
+    urgency: end-of-day
+    options:
+      - id: keep-routine
+        label: "Keep the routine"
+        description: "Don't change what's working"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 10
+        risk_level: safe
+        success_text: "Consistency maintains momentum."
+      - id: manage-expectations
+        label: "Manage expectations"
+        description: "Keep the team grounded"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 5
+        risk_level: safe
+        success_text: "The team stays focused and humble."
+      - id: enjoy-moment
+        label: "Enjoy the moment"
+        description: "These runs are special - savor it"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 15
+        risk_level: moderate
+        success_text: "The team is confident and enjoying their cricket."
+        failure_text: "Overconfidence creeps in."
+        success_chance: 0.7
+
+  # ============================================
+  # RIVALRY MATCHES (4)
+  # ============================================
+  - id: season-rivalry-buildup
+    category: season
+    title: "Rivalry Match Approaching"
+    description_template: "The big derby match is approaching. The tension is building among fans, players, and media."
+    conditions:
+      - type: phase
+        phases: ["season"]
+    target_player_conditions: []
+    weight: 8
+    cooldown_days: 30
+    urgency: this-week
+    options:
+      - id: embrace-occasion
+        label: "Embrace the occasion"
+        description: "These are the matches players live for"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 15
+        risk_level: safe
+        success_text: "The team is excited for the challenge."
+      - id: just-another-game
+        label: "Treat it like any other game"
+        description: "Same preparation, same focus"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 5
+        risk_level: moderate
+        success_text: "A professional approach prevails."
+        failure_text: "Players feel the occasion was undersold."
+        success_chance: 0.6
+      - id: extra-preparation
+        label: "Extra preparation"
+        description: "Leave nothing to chance against them"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 10
+          - target: team
+            attribute: fatigue
+            change: 5
+        risk_level: moderate
+        success_text: "The detailed preparation pays off."
+
+  - id: season-rivalry-win
+    category: season
+    title: "Rivalry Match Victory"
+    description_template: "Victory in the derby! The fans are delirious and the dressing room is buzzing."
+    conditions:
+      - type: phase
+        phases: ["season"]
+      - type: streak
+        streak_type: winning
+        operator: ge
+        value: 1
+    target_player_conditions: []
+    weight: 6
+    cooldown_days: 30
+    urgency: immediate
+    options:
+      - id: celebrate-big
+        label: "Big celebration"
+        description: "Let the team enjoy this one"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 20
+        risk_level: safe
+        success_text: "A memorable celebration bonds the squad."
+      - id: gracious-winners
+        label: "Gracious in victory"
+        description: "Win with class - no rubbing it in"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 10
+          - target: team
+            attribute: press_heat
+            change: -10
+        risk_level: safe
+        success_text: "The dignified approach earns respect."
+      - id: use-momentum
+        label: "Build on the momentum"
+        description: "Channel the energy into the next game"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 15
+        risk_level: safe
+        success_text: "The momentum carries forward."
+
+  - id: season-rivalry-loss
+    category: season
+    title: "Rivalry Match Defeat"
+    description_template: "Defeat in the derby. The fans are devastated and the media are circling."
+    conditions:
+      - type: phase
+        phases: ["season"]
+      - type: streak
+        streak_type: losing
+        operator: ge
+        value: 1
+    target_player_conditions: []
+    weight: 8
+    cooldown_days: 30
+    urgency: immediate
+    options:
+      - id: shield-players
+        label: "Shield the players"
+        description: "Take responsibility and protect the squad"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 15
+          - target: team
+            attribute: press_heat
+            change: 10
+        risk_level: safe
+        success_text: "The players appreciate your protection."
+      - id: honest-analysis
+        label: "Honest analysis"
+        description: "What went wrong and how to fix it"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 5
+        risk_level: safe
+        success_text: "Constructive review helps the team move forward."
+      - id: motivate-revenge
+        label: "Plot revenge"
+        description: "Use the defeat as motivation"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 10
+        risk_level: moderate
+        success_text: "The team is determined to get revenge next time."
+
+  - id: season-rivalry-controversy
+    category: season
+    title: "Derby Controversy"
+    description_template: "A controversial incident in the rivalry match has created a storm. Both teams are trading accusations."
+    conditions:
+      - type: phase
+        phases: ["season"]
+    target_player_conditions: []
+    weight: 5
+    cooldown_days: 30
+    urgency: immediate
+    options:
+      - id: defend-team
+        label: "Defend your team strongly"
+        description: "Back your players publicly"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 15
+          - target: team
+            attribute: press_heat
+            change: 15
+        risk_level: risky
+        success_text: "The players appreciate your strong defense."
+        failure_text: "The controversy escalates further."
+        success_chance: 0.6
+      - id: calm-waters
+        label: "Pour oil on troubled waters"
+        description: "Try to de-escalate the situation"
+        effects:
+          - target: team
+            attribute: press_heat
+            change: -10
+        risk_level: safe
+        success_text: "Your measured response helps calm things down."
+      - id: no-comment
+        label: "No comment"
+        description: "Let the officials handle it"
+        effects:
+          - target: team
+            attribute: press_heat
+            change: 5
+        risk_level: moderate
+        success_text: "The story loses steam without fuel."
+        failure_text: "Your silence is seen as admission."
+        success_chance: 0.5
+
+  # ============================================
+  # DISRUPTIONS (3)
+  # ============================================
+  - id: season-weather-delay
+    category: season
+    title: "Weather Disruption"
+    description_template: "Rain has forced significant delays to the schedule. Several matches may need rescheduling."
+    conditions:
+      - type: phase
+        phases: ["season"]
+    target_player_conditions: []
+    weight: 4
+    cooldown_days: 30
+    urgency: this-week
+    options:
+      - id: use-downtime
+        label: "Use the downtime well"
+        description: "Extra practice and recovery"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 10
+        risk_level: safe
+        success_text: "The break helps recharge batteries."
+      - id: maintain-intensity
+        label: "Maintain match intensity"
+        description: "Keep players sharp with competitive practice"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 5
+        risk_level: moderate
+        success_text: "The squad stays match-ready."
+      - id: mental-break
+        label: "Give them a mental break"
+        description: "Time away from cricket completely"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 15
+        risk_level: safe
+        success_text: "Players return refreshed and eager."
+
+  - id: season-venue-change
+    category: season
+    title: "Venue Change"
+    description_template: "Due to unforeseen circumstances, your next home match has been moved to a different venue."
+    conditions:
+      - type: phase
+        phases: ["season"]
+    target_player_conditions: []
+    weight: 4
+    cooldown_days: 60
+    urgency: this-week
+    options:
+      - id: adapt-quickly
+        label: "Adapt quickly"
+        description: "Scout the new venue and adjust"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 5
+        risk_level: safe
+        success_text: "The team adapts professionally to the change."
+      - id: complain-loudly
+        label: "Voice concerns"
+        description: "Make clear this isn't acceptable"
+        effects:
+          - target: team
+            attribute: press_heat
+            change: 10
+          - target: team
+            attribute: board_patience
+            change: -5
+        risk_level: risky
+        success_text: "Your concerns are noted for the future."
+        failure_text: "You look like you're making excuses."
+        success_chance: 0.4
+      - id: opportunity
+        label: "Frame as opportunity"
+        description: "Different conditions can favor us"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 10
+        risk_level: safe
+        success_text: "The positive framing works."
+
+  - id: season-schedule-congestion
+    category: season
+    title: "Schedule Congestion"
+    description_template: "A packed schedule means playing three matches in six days. Squad management becomes crucial."
+    conditions:
+      - type: phase
+        phases: ["season"]
+      - type: game_context
+        attribute: match_day
+        operator: ge
+        value: 8
+    target_player_conditions: []
+    weight: 6
+    cooldown_days: 30
+    urgency: immediate
+    options:
+      - id: rotate-squad
+        label: "Rotate the squad"
+        description: "Share the workload across the group"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 10
+        risk_level: safe
+        success_text: "Smart rotation keeps everyone fresh."
+      - id: push-through
+        label: "Push through with best XI"
+        description: "No time for rotation - play your best"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: -5
+          - target: team
+            attribute: fatigue
+            change: 15
+        risk_level: risky
+        success_text: "The team digs deep and delivers."
+        failure_text: "The workload takes its toll."
+        success_chance: 0.5
+      - id: prioritize-matches
+        label: "Prioritize certain matches"
+        description: "Rest players for bigger games"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 5
+        risk_level: moderate
+        success_text: "Strategic planning pays dividends."
+
+  # ============================================
+  # CELEBRATIONS (2)
+  # ============================================
+  - id: season-trophy-win
+    category: season
+    title: "Championship Glory"
+    description_template: "You've won the championship! The trophy is yours. What an incredible achievement!"
+    conditions:
+      - type: phase
+        phases: ["playoffs"]
+    target_player_conditions: []
+    weight: 20
+    cooldown_days: 365
+    urgency: immediate
+    options:
+      - id: grand-celebration
+        label: "Grand celebration"
+        description: "Celebrate in style - you've earned it"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 30
+          - target: team
+            attribute: board_patience
+            change: 25
+        risk_level: safe
+        success_text: "An unforgettable celebration for a historic achievement."
+      - id: credit-everyone
+        label: "Credit everyone"
+        description: "Share the glory with all who contributed"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 25
+        risk_level: safe
+        success_text: "The inclusive celebration bonds the entire franchise."
+      - id: already-planning
+        label: "Already planning next season"
+        description: "Can we go back-to-back?"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 15
+        risk_level: safe
+        success_text: "The hunger for more success remains."
+
+  - id: season-final-loss
+    category: season
+    title: "Final Heartbreak"
+    description_template: "So close, yet so far. Defeat in the final hurts deeply. The team is devastated."
+    conditions:
+      - type: phase
+        phases: ["playoffs"]
+    target_player_conditions: []
+    weight: 15
+    cooldown_days: 365
+    urgency: immediate
+    options:
+      - id: console-squad
+        label: "Console the squad"
+        description: "Be there for them in the tough moment"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 10
+        risk_level: safe
+        success_text: "Your support helps them cope with the disappointment."
+      - id: perspective
+        label: "Offer perspective"
+        description: "Reaching the final is still an achievement"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 5
+        risk_level: moderate
+        success_text: "They gain perspective on the season as a whole."
+        failure_text: "They wanted to win, not be reminded of losing."
+        success_chance: 0.6
+      - id: use-as-motivation
+        label: "Use it as motivation"
+        description: "Channel the pain into next season"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 15
+        risk_level: safe
+        success_text: "The determination to win next time burns brighter."

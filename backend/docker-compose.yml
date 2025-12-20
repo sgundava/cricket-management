@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./app:/app/app
+      - ./config:/app/config
+    environment:
+      - DEBUG=true
+    restart: unless-stopped
+
+  # Optional: Redis for caching (Phase 4)
+  # redis:
+  #   image: redis:7-alpine
+  #   ports:
+  #     - "6379:6379"
+
+  # Optional: PostgreSQL for persistence (Phase 4)
+  # db:
+  #   image: postgres:15-alpine
+  #   environment:
+  #     - POSTGRES_USER=cricket
+  #     - POSTGRES_PASSWORD=cricket
+  #     - POSTGRES_DB=cricket_management
+  #   ports:
+  #     - "5432:5432"
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+
+# volumes:
+#   postgres_data:

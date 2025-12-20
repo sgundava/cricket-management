@@ -1,0 +1,1210 @@
+# Media Events - 26 templates
+# Categories: press conferences, rumors, criticism, viral moments, pundit criticism
+
+templates:
+  # ============================================
+  # PRESS CONFERENCE CHALLENGES (6)
+  # ============================================
+  - id: media-press-losing-streak
+    category: media
+    title: "Losing Streak Questions"
+    description_template: "At the post-match press conference, journalists are grilling you about the team's {streak}-match losing streak. 'What's gone wrong?' they demand."
+    conditions:
+      - type: phase
+        phases: ["season"]
+      - type: streak
+        streak_type: losing
+        operator: ge
+        value: 3
+    target_player_conditions: []
+    weight: 15
+    cooldown_days: 7
+    urgency: immediate
+    options:
+      - id: stay-positive
+        label: "Stay positive"
+        description: "Focus on what you're doing to turn things around"
+        effects:
+          - target: team
+            attribute: press_heat
+            change: -5
+          - target: team
+            attribute: team_morale
+            change: 5
+        risk_level: safe
+        success_text: "Your composed response earns respect from the media."
+      - id: deflect
+        label: "Deflect questions"
+        description: "Avoid giving them headlines"
+        effects:
+          - target: team
+            attribute: press_heat
+            change: 5
+        risk_level: moderate
+        success_text: "You give nothing away."
+        failure_text: "'Coach refuses to answer' becomes the headline."
+        success_chance: 0.5
+      - id: honest-assessment
+        label: "Give honest assessment"
+        description: "Admit to problems and promise fixes"
+        effects:
+          - target: team
+            attribute: press_heat
+            change: -10
+          - target: team
+            attribute: board_patience
+            change: -5
+        risk_level: moderate
+        success_text: "Your honesty is refreshing and wins fans over."
+        failure_text: "The board is unhappy you aired dirty laundry publicly."
+        success_chance: 0.6
+
+  - id: media-press-captain-question
+    category: media
+    title: "Captain Leadership Question"
+    description_template: "A journalist asks directly: 'Do you still have faith in your captain's leadership?' The room goes quiet."
+    conditions:
+      - type: phase
+        phases: ["season"]
+      - type: streak
+        streak_type: losing
+        operator: ge
+        value: 2
+    target_player_conditions: []
+    weight: 8
+    cooldown_days: 14
+    urgency: immediate
+    options:
+      - id: full-backing
+        label: "Give full backing"
+        description: "Defend your captain unequivocally"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 15
+          - target: team
+            attribute: press_heat
+            change: -5
+        risk_level: safe
+        success_text: "Your loyalty to the captain sends a strong message."
+      - id: diplomatic
+        label: "Diplomatic answer"
+        description: "Support but note 'everyone is under scrutiny'"
+        effects:
+          - target: team
+            attribute: press_heat
+            change: 5
+        risk_level: moderate
+        success_text: "A balanced response that doesn't make headlines."
+        failure_text: "'Coach hints at captaincy change' runs tomorrow."
+        success_chance: 0.5
+      - id: refuse-answer
+        label: "Refuse to answer"
+        description: "Dismiss the question as divisive"
+        effects:
+          - target: team
+            attribute: press_heat
+            change: 10
+        risk_level: risky
+        success_text: "You shut down the narrative."
+        failure_text: "Your refusal is seen as damning with faint praise."
+        success_chance: 0.4
+
+  - id: media-press-selection-controversy
+    category: media
+    title: "Selection Controversy"
+    description_template: "Questions are being asked about a controversial selection decision. 'Why was [player] left out?' the journalists demand."
+    conditions:
+      - type: phase
+        phases: ["season"]
+    target_player_conditions: []
+    weight: 10
+    cooldown_days: 10
+    urgency: immediate
+    options:
+      - id: explain-logic
+        label: "Explain the logic"
+        description: "Give tactical reasons for the decision"
+        effects:
+          - target: team
+            attribute: press_heat
+            change: -5
+        risk_level: safe
+        success_text: "Your reasoning satisfies most of the press."
+      - id: back-selected
+        label: "Back the selected players"
+        description: "Focus on who's playing, not who's not"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 5
+        risk_level: safe
+        success_text: "You redirect attention to the playing XI."
+      - id: keep-private
+        label: "Keep selection matters private"
+        description: "Decline to discuss individual cases"
+        effects:
+          - target: team
+            attribute: press_heat
+            change: 5
+        risk_level: moderate
+        success_text: "You maintain team confidentiality."
+        failure_text: "The media speculates wildly in absence of facts."
+        success_chance: 0.6
+
+  - id: media-press-tactical-criticism
+    category: media
+    title: "Tactical Criticism"
+    description_template: "Former players and pundits have criticized your tactical approach. Journalists want your response to the criticism."
+    conditions:
+      - type: phase
+        phases: ["season"]
+      - type: results
+        count: 3
+        result: loss
+        operator: ge
+        value: 2
+    target_player_conditions: []
+    weight: 8
+    cooldown_days: 14
+    urgency: end-of-day
+    options:
+      - id: defend-approach
+        label: "Defend your approach"
+        description: "Explain why your tactics are right"
+        effects:
+          - target: team
+            attribute: press_heat
+            change: 5
+        risk_level: moderate
+        success_text: "You make a compelling case for your methods."
+        failure_text: "You come across as defensive."
+        success_chance: 0.6
+      - id: acknowledge-evolve
+        label: "Acknowledge and evolve"
+        description: "Accept there's room for improvement"
+        effects:
+          - target: team
+            attribute: press_heat
+            change: -10
+          - target: team
+            attribute: board_patience
+            change: 5
+        risk_level: safe
+        success_text: "Your humility wins over critics."
+      - id: dismiss-critics
+        label: "Dismiss the critics"
+        description: "Question their credentials to criticize"
+        effects:
+          - target: team
+            attribute: press_heat
+            change: 15
+        risk_level: risky
+        success_text: "Your confidence silences some doubters."
+        failure_text: "You've made enemies in the media."
+        success_chance: 0.3
+
+  - id: media-press-winning-streak
+    category: media
+    title: "Winning Streak Hype"
+    description_template: "The media are hailing your {streak}-match winning streak. 'Are you title favorites now?' they ask excitedly."
+    conditions:
+      - type: phase
+        phases: ["season"]
+      - type: streak
+        streak_type: winning
+        operator: ge
+        value: 4
+    target_player_conditions: []
+    weight: 10
+    cooldown_days: 7
+    urgency: end-of-day
+    options:
+      - id: stay-humble
+        label: "Stay humble"
+        description: "Downplay expectations and focus on next game"
+        effects:
+          - target: team
+            attribute: press_heat
+            change: -5
+          - target: team
+            attribute: team_morale
+            change: 5
+        risk_level: safe
+        success_text: "Your grounded response keeps the team focused."
+      - id: embrace-confidence
+        label: "Embrace confidence"
+        description: "Acknowledge the team's excellent form"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 10
+          - target: team
+            attribute: press_heat
+            change: 10
+        risk_level: moderate
+        success_text: "The confidence boost helps the team."
+        failure_text: "Opponents are now extra motivated to beat you."
+        success_chance: 0.7
+      - id: deflect-praise
+        label: "Deflect praise to players"
+        description: "Give all credit to the squad"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 15
+        risk_level: safe
+        success_text: "Players appreciate being acknowledged."
+
+  - id: media-press-playoff-pressure
+    category: media
+    title: "Playoff Pressure Questions"
+    description_template: "With the playoffs approaching, the press are asking how you'll handle the pressure of knockout cricket."
+    conditions:
+      - type: phase
+        phases: ["season"]
+      - type: game_context
+        attribute: match_day
+        operator: ge
+        value: 11
+    target_player_conditions: []
+    weight: 8
+    cooldown_days: 14
+    urgency: end-of-day
+    options:
+      - id: pressure-privilege
+        label: "Pressure is a privilege"
+        description: "Frame it positively - it means you're competing"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 10
+        risk_level: safe
+        success_text: "Your positive framing resonates with the squad."
+      - id: experienced-squad
+        label: "Trust the experience"
+        description: "Point to the experience in your squad"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 5
+        risk_level: safe
+        success_text: "Senior players appreciate the acknowledgment."
+      - id: one-game-at-time
+        label: "One game at a time"
+        description: "Refuse to look beyond the next match"
+        effects:
+          - target: team
+            attribute: press_heat
+            change: -5
+        risk_level: safe
+        success_text: "You keep everyone focused on the present."
+
+  # ============================================
+  # RUMORS & SPECULATION (5)
+  # ============================================
+  - id: media-rumor-sacking
+    category: media
+    title: "Job Security Rumors"
+    description_template: "There are media reports that your job is under threat. Sources claim the board is considering a change."
+    conditions:
+      - type: phase
+        phases: ["season"]
+      - type: team_state
+        attribute: board_patience
+        operator: lt
+        value: 40
+    target_player_conditions: []
+    weight: 6
+    cooldown_days: 21
+    urgency: immediate
+    options:
+      - id: deny-rumors
+        label: "Deny the rumors"
+        description: "Insist your position is secure"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 5
+        risk_level: moderate
+        success_text: "The denial helps settle things down."
+        failure_text: "The denial looks weak if results don't improve."
+        success_chance: 0.6
+      - id: focus-on-job
+        label: "Focus on the job"
+        description: "Refuse to engage with speculation"
+        effects:
+          - target: team
+            attribute: press_heat
+            change: 5
+        risk_level: safe
+        success_text: "You take the high road."
+      - id: seek-clarity
+        label: "Seek clarity from board"
+        description: "Ask for confirmation of their support"
+        effects:
+          - target: team
+            attribute: board_patience
+            change: 10
+        risk_level: moderate
+        success_text: "The board publicly backs you."
+        failure_text: "The conversation is... concerning."
+        success_chance: 0.5
+
+  - id: media-rumor-rift
+    category: media
+    title: "Dressing Room Rift Rumor"
+    description_template: "Media outlets are running stories about a rift in the dressing room. 'Sources' claim players are unhappy."
+    conditions:
+      - type: phase
+        phases: ["season"]
+      - type: team_state
+        attribute: team_morale
+        operator: lt
+        value: 60
+    target_player_conditions: []
+    weight: 7
+    cooldown_days: 14
+    urgency: immediate
+    options:
+      - id: strongly-deny
+        label: "Strongly deny"
+        description: "Call the reports baseless and damaging"
+        effects:
+          - target: team
+            attribute: press_heat
+            change: -5
+          - target: team
+            attribute: team_morale
+            change: 5
+        risk_level: moderate
+        success_text: "Your forceful denial shuts down the story."
+        failure_text: "The strength of denial seems suspicious."
+        success_chance: 0.6
+      - id: show-unity
+        label: "Show unity"
+        description: "Organize a public display of team togetherness"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 10
+          - target: team
+            attribute: press_heat
+            change: -10
+        risk_level: safe
+        success_text: "The show of unity kills the story."
+      - id: no-comment
+        label: "No comment"
+        description: "Let the results do the talking"
+        effects:
+          - target: team
+            attribute: press_heat
+            change: 10
+        risk_level: risky
+        success_text: "The story fades without fuel."
+        failure_text: "Your silence is seen as confirmation."
+        success_chance: 0.4
+
+  - id: media-rumor-tactics
+    category: media
+    title: "Tactics Leak"
+    description_template: "There are reports that your team's tactical plans have been leaked. Opposition teams may know your strategies."
+    conditions:
+      - type: phase
+        phases: ["season", "playoffs"]
+    target_player_conditions: []
+    weight: 4
+    cooldown_days: 30
+    urgency: immediate
+    options:
+      - id: investigate
+        label: "Launch investigation"
+        description: "Find out how this happened"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: -5
+        risk_level: moderate
+        success_text: "The investigation identifies and fixes the leak."
+        failure_text: "The investigation creates tension within the group."
+        success_chance: 0.6
+      - id: change-tactics
+        label: "Change your tactics"
+        description: "If they know, surprise them with something new"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 5
+        risk_level: moderate
+        success_text: "The tactical shift catches opponents off guard."
+      - id: dismiss-impact
+        label: "Dismiss the impact"
+        description: "Execution matters more than knowledge"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 10
+        risk_level: safe
+        success_text: "Your confidence reassures the team."
+
+  - id: media-rumor-bid
+    category: media
+    title: "Franchise Sale Rumors"
+    description_template: "Reports suggest the franchise owners are considering selling. This could mean major changes ahead."
+    conditions:
+      - type: phase
+        phases: ["off-season"]
+    target_player_conditions: []
+    weight: 3
+    cooldown_days: 60
+    urgency: this-week
+    options:
+      - id: reassure-squad
+        label: "Reassure the squad"
+        description: "Tell players nothing will change for them"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 10
+        risk_level: safe
+        success_text: "Players are reassured about their futures."
+      - id: seek-information
+        label: "Seek information from owners"
+        description: "Find out what's really happening"
+        effects:
+          - target: team
+            attribute: board_patience
+            change: 5
+        risk_level: safe
+        success_text: "You get clarity on the situation."
+      - id: prepare-contingencies
+        label: "Prepare contingencies"
+        description: "Plan for different scenarios"
+        effects: []
+        risk_level: safe
+        success_text: "You're ready for whatever comes."
+
+  - id: media-rumor-signing
+    category: media
+    title: "Big Signing Rumors"
+    description_template: "Media are linking your franchise with a blockbuster signing. Fans are excited, but nothing is confirmed."
+    conditions:
+      - type: phase
+        phases: ["off-season", "pre-season"]
+    target_player_conditions: []
+    weight: 6
+    cooldown_days: 30
+    urgency: this-week
+    options:
+      - id: fuel-speculation
+        label: "Fuel the speculation"
+        description: "Hint that something might be happening"
+        effects:
+          - target: team
+            attribute: press_heat
+            change: 15
+          - target: team
+            attribute: team_morale
+            change: 5
+        risk_level: risky
+        success_text: "The hype builds excitement around the franchise."
+        failure_text: "If it doesn't happen, you'll look foolish."
+        success_chance: 0.6
+      - id: play-down
+        label: "Play it down"
+        description: "Don't comment on transfer speculation"
+        effects:
+          - target: team
+            attribute: press_heat
+            change: -5
+        risk_level: safe
+        success_text: "You avoid building unrealistic expectations."
+      - id: focus-on-squad
+        label: "Back current squad"
+        description: "Express confidence in existing players"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 10
+        risk_level: safe
+        success_text: "Current players appreciate not being overlooked."
+
+  # ============================================
+  # PUNDIT CRITICISM (5)
+  # ============================================
+  - id: media-pundit-legend-criticism
+    category: media
+    title: "Legend's Criticism"
+    description_template: "A cricket legend has publicly criticized your team's approach. Their opinion carries weight and is making headlines."
+    conditions:
+      - type: phase
+        phases: ["season"]
+      - type: results
+        count: 3
+        result: loss
+        operator: ge
+        value: 2
+    target_player_conditions: []
+    weight: 8
+    cooldown_days: 14
+    urgency: end-of-day
+    options:
+      - id: respectful-disagree
+        label: "Respectfully disagree"
+        description: "Acknowledge their stature but defend your methods"
+        effects:
+          - target: team
+            attribute: press_heat
+            change: 5
+        risk_level: moderate
+        success_text: "Your measured response is well received."
+      - id: seek-advice
+        label: "Seek their advice"
+        description: "Reach out and ask for their input"
+        effects:
+          - target: team
+            attribute: press_heat
+            change: -15
+        risk_level: safe
+        success_text: "Your humility impresses everyone. They offer valuable insights."
+      - id: ignore-criticism
+        label: "Ignore the criticism"
+        description: "Don't engage with media punditry"
+        effects:
+          - target: team
+            attribute: press_heat
+            change: 10
+        risk_level: risky
+        success_text: "You stay focused on what matters."
+        failure_text: "Your silence is seen as arrogance."
+        success_chance: 0.5
+
+  - id: media-pundit-panel-attack
+    category: media
+    title: "Panel Discussion Attack"
+    description_template: "A prime-time TV panel has launched a scathing attack on your team's performance. The criticism is trending on social media."
+    conditions:
+      - type: phase
+        phases: ["season"]
+      - type: streak
+        streak_type: losing
+        operator: ge
+        value: 2
+    target_player_conditions: []
+    weight: 7
+    cooldown_days: 10
+    urgency: end-of-day
+    options:
+      - id: media-boycott
+        label: "Threaten media boycott"
+        description: "Warn of consequences for unfair coverage"
+        effects:
+          - target: team
+            attribute: press_heat
+            change: 20
+        risk_level: risky
+        success_text: "Some outlets back down."
+        failure_text: "You've declared war on the media."
+        success_chance: 0.3
+      - id: take-high-road
+        label: "Take the high road"
+        description: "Refuse to engage with criticism"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 5
+        risk_level: safe
+        success_text: "Your dignity intact, you focus on cricket."
+      - id: respond-results
+        label: "Let results respond"
+        description: "Motivate team to prove critics wrong"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 10
+        risk_level: safe
+        success_text: "The criticism becomes motivation."
+
+  - id: media-pundit-comparison
+    category: media
+    title: "Unfavorable Comparison"
+    description_template: "Pundits are comparing your team unfavorably to rivals. 'Why can't they play like [other team]?' is the question of the day."
+    conditions:
+      - type: phase
+        phases: ["season"]
+    target_player_conditions: []
+    weight: 7
+    cooldown_days: 14
+    urgency: end-of-day
+    options:
+      - id: different-style
+        label: "Embrace your style"
+        description: "Point out that every team has its own identity"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 10
+        risk_level: safe
+        success_text: "The squad appreciates your faith in their approach."
+      - id: learn-from-rivals
+        label: "Acknowledge rivals' strengths"
+        description: "Admit there's learning to be done"
+        effects:
+          - target: team
+            attribute: press_heat
+            change: -5
+          - target: team
+            attribute: team_morale
+            change: -5
+        risk_level: moderate
+        success_text: "Your humility is noted, but some players feel slighted."
+      - id: challenge-comparison
+        label: "Challenge the comparison"
+        description: "Question the validity of comparing different teams"
+        effects:
+          - target: team
+            attribute: press_heat
+            change: 10
+        risk_level: moderate
+        success_text: "You make valid points about context."
+        failure_text: "You come across as making excuses."
+        success_chance: 0.5
+
+  - id: media-pundit-player-target
+    category: media
+    title: "Pundit Targets Player"
+    description_template: "A prominent pundit has singled out {player.name} for criticism, calling their form 'unacceptable for this level'."
+    conditions:
+      - type: phase
+        phases: ["season"]
+    target_player_conditions:
+      - type: player_attribute
+        attribute: form
+        operator: lt
+        value: -2
+    weight: 8
+    cooldown_days: 14
+    urgency: immediate
+    options:
+      - id: defend-player
+        label: "Defend the player publicly"
+        description: "Stand up for your player in the media"
+        effects:
+          - target: player
+            attribute: morale
+            change: 20
+          - target: team
+            attribute: team_morale
+            change: 5
+        risk_level: safe
+        success_text: "The player and squad appreciate your loyalty."
+      - id: private-support
+        label: "Support privately"
+        description: "Reassure the player without engaging the media"
+        effects:
+          - target: player
+            attribute: morale
+            change: 15
+        risk_level: safe
+        success_text: "The player knows you have their back."
+      - id: no-comment
+        label: "No comment"
+        description: "Don't engage with individual player criticism"
+        effects:
+          - target: player
+            attribute: morale
+            change: -10
+        risk_level: moderate
+        success_text: "The story dies quickly."
+        failure_text: "The player feels abandoned."
+        success_chance: 0.5
+
+  - id: media-pundit-tactical-analysis
+    category: media
+    title: "Tactical Breakdown"
+    description_template: "A detailed tactical analysis has exposed weaknesses in your team's approach. The breakdown is going viral."
+    conditions:
+      - type: phase
+        phases: ["season"]
+      - type: results
+        count: 3
+        result: loss
+        operator: ge
+        value: 2
+    target_player_conditions: []
+    weight: 6
+    cooldown_days: 21
+    urgency: this-week
+    options:
+      - id: address-points
+        label: "Address the points raised"
+        description: "Acknowledge the analysis and explain your thinking"
+        effects:
+          - target: team
+            attribute: press_heat
+            change: -10
+        risk_level: safe
+        success_text: "Your engagement with the criticism wins respect."
+      - id: adapt-tactics
+        label: "Adapt your tactics"
+        description: "Make changes based on the feedback"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 5
+        risk_level: moderate
+        success_text: "The tactical adjustments work."
+        failure_text: "Changing approach causes confusion."
+        success_chance: 0.6
+      - id: stay-course
+        label: "Stay the course"
+        description: "Trust your process despite the noise"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 10
+        risk_level: moderate
+        success_text: "Your conviction reassures the players."
+        failure_text: "The same problems keep occurring."
+        success_chance: 0.5
+
+  # ============================================
+  # VIRAL MOMENTS (5)
+  # ============================================
+  - id: media-viral-celebration
+    category: media
+    title: "Celebration Goes Viral"
+    description_template: "A player's unique celebration after a big moment has gone viral. The internet is loving it."
+    conditions:
+      - type: phase
+        phases: ["season"]
+      - type: streak
+        streak_type: winning
+        operator: ge
+        value: 1
+    target_player_conditions: []
+    weight: 8
+    cooldown_days: 14
+    urgency: end-of-day
+    options:
+      - id: embrace-fun
+        label: "Embrace the fun"
+        description: "Encourage the positive attention"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 15
+          - target: team
+            attribute: press_heat
+            change: -10
+        risk_level: safe
+        success_text: "The team enjoys the positive buzz."
+      - id: commercial-opportunity
+        label: "Explore commercial angle"
+        description: "See if brands want to get involved"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 5
+        risk_level: moderate
+        success_text: "Some interesting sponsorship discussions begin."
+      - id: keep-focused
+        label: "Keep team focused"
+        description: "Remind everyone about the cricket"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 5
+        risk_level: safe
+        success_text: "The team stays grounded despite the attention."
+
+  - id: media-viral-interview
+    category: media
+    title: "Interview Clip Goes Viral"
+    description_template: "A clip from your recent interview is being widely shared. Your quote has been taken out of context."
+    conditions:
+      - type: phase
+        phases: ["season"]
+    target_player_conditions: []
+    weight: 5
+    cooldown_days: 21
+    urgency: immediate
+    options:
+      - id: clarify-context
+        label: "Clarify the context"
+        description: "Explain what you actually meant"
+        effects:
+          - target: team
+            attribute: press_heat
+            change: -10
+        risk_level: safe
+        success_text: "The full context puts things in perspective."
+      - id: own-it
+        label: "Own it"
+        description: "Stand by your words regardless of interpretation"
+        effects:
+          - target: team
+            attribute: press_heat
+            change: 10
+        risk_level: risky
+        success_text: "Your conviction earns respect from some."
+        failure_text: "The controversy escalates."
+        success_chance: 0.5
+      - id: ignore-noise
+        label: "Ignore the noise"
+        description: "Don't engage with social media drama"
+        effects:
+          - target: team
+            attribute: press_heat
+            change: 5
+        risk_level: moderate
+        success_text: "The news cycle moves on."
+        failure_text: "Your silence is taken as confirmation."
+        success_chance: 0.6
+
+  - id: media-viral-fan-moment
+    category: media
+    title: "Fan Interaction Moment"
+    description_template: "A player's heartwarming interaction with a fan at the stadium has gone viral. The franchise is getting great publicity."
+    conditions:
+      - type: phase
+        phases: ["season"]
+    target_player_conditions: []
+    weight: 8
+    cooldown_days: 14
+    urgency: end-of-day
+    options:
+      - id: amplify-story
+        label: "Amplify the story"
+        description: "Share it on all franchise channels"
+        effects:
+          - target: team
+            attribute: press_heat
+            change: -15
+          - target: team
+            attribute: team_morale
+            change: 10
+        risk_level: safe
+        success_text: "Great PR for the franchise. Everyone wins."
+      - id: invite-fan
+        label: "Invite the fan back"
+        description: "Arrange a special experience for them"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 15
+        risk_level: safe
+        success_text: "The follow-up story generates even more positivity."
+      - id: low-key
+        label: "Keep it low-key"
+        description: "Let the moment speak for itself"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 5
+        risk_level: safe
+        success_text: "The organic nature of the moment is preserved."
+
+  - id: media-viral-training-clip
+    category: media
+    title: "Training Clip Leaks"
+    description_template: "A video from training has leaked showing an intense exchange between staff and players. The media are asking questions."
+    conditions:
+      - type: phase
+        phases: ["season"]
+    target_player_conditions: []
+    weight: 5
+    cooldown_days: 21
+    urgency: immediate
+    options:
+      - id: downplay
+        label: "Downplay the incident"
+        description: "Frame it as normal competitive training"
+        effects:
+          - target: team
+            attribute: press_heat
+            change: -5
+        risk_level: safe
+        success_text: "The explanation is accepted."
+      - id: investigate-leak
+        label: "Investigate the leak"
+        description: "Find out who shared the video"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: -10
+        risk_level: risky
+        success_text: "You identify and address the source."
+        failure_text: "The investigation creates paranoia in the camp."
+        success_chance: 0.5
+      - id: embrace-intensity
+        label: "Embrace the intensity"
+        description: "Spin it as a sign of your competitive environment"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 5
+        risk_level: moderate
+        success_text: "The narrative becomes about your high standards."
+
+  - id: media-viral-meme
+    category: media
+    title: "Team Becomes a Meme"
+    description_template: "After a particularly poor performance, your team has become a meme on social media. The mockery is everywhere."
+    conditions:
+      - type: phase
+        phases: ["season"]
+      - type: streak
+        streak_type: losing
+        operator: ge
+        value: 2
+    target_player_conditions: []
+    weight: 6
+    cooldown_days: 14
+    urgency: end-of-day
+    options:
+      - id: self-deprecate
+        label: "Show self-deprecating humor"
+        description: "Join in the joke to take the sting out"
+        effects:
+          - target: team
+            attribute: press_heat
+            change: -15
+          - target: team
+            attribute: team_morale
+            change: 5
+        risk_level: moderate
+        success_text: "Your ability to laugh at yourself wins fans over."
+        failure_text: "Some feel you're not taking things seriously enough."
+        success_chance: 0.7
+      - id: block-out
+        label: "Block out social media"
+        description: "Advise players to stay off social platforms"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 10
+        risk_level: safe
+        success_text: "The team focuses on what they can control."
+      - id: use-motivation
+        label: "Use it as motivation"
+        description: "Let the mockery fuel the fire"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 15
+        risk_level: safe
+        success_text: "The squad is determined to shut up the critics."
+
+  # ============================================
+  # MISCELLANEOUS MEDIA (5)
+  # ============================================
+  - id: media-documentary-access
+    category: media
+    title: "Documentary Request"
+    description_template: "A major streaming platform wants to film a behind-the-scenes documentary about your franchise. They're offering significant money."
+    conditions:
+      - type: phase
+        phases: ["pre-season", "off-season"]
+    target_player_conditions: []
+    weight: 3
+    cooldown_days: 60
+    urgency: this-week
+    options:
+      - id: accept-access
+        label: "Grant full access"
+        description: "Let them document everything"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: -5
+        risk_level: risky
+        success_text: "The documentary becomes a hit and boosts the franchise profile."
+        failure_text: "Private moments and tensions become public knowledge."
+        success_chance: 0.5
+      - id: limited-access
+        label: "Grant limited access"
+        description: "Control what they can film"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 5
+        risk_level: safe
+        success_text: "A balanced documentary that protects the team."
+      - id: decline
+        label: "Decline the offer"
+        description: "Protect the team's privacy"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 10
+        risk_level: safe
+        success_text: "Players appreciate the privacy being valued."
+
+  - id: media-exclusive-interview
+    category: media
+    title: "Exclusive Interview Request"
+    description_template: "A major news outlet wants an exclusive in-depth interview. It could be great exposure but comes with risks."
+    conditions:
+      - type: phase
+        phases: ["season"]
+    target_player_conditions: []
+    weight: 5
+    cooldown_days: 30
+    urgency: this-week
+    options:
+      - id: accept-interview
+        label: "Accept the interview"
+        description: "Take the opportunity to share your story"
+        effects:
+          - target: team
+            attribute: press_heat
+            change: 10
+        risk_level: moderate
+        success_text: "The interview generates positive coverage."
+        failure_text: "Some quotes are spun negatively."
+        success_chance: 0.6
+      - id: postpone
+        label: "Postpone until off-season"
+        description: "Focus on cricket during the season"
+        effects:
+          - target: team
+            attribute: press_heat
+            change: -5
+        risk_level: safe
+        success_text: "They agree to wait."
+      - id: decline
+        label: "Decline politely"
+        description: "Prefer to keep a low media profile"
+        effects:
+          - target: team
+            attribute: press_heat
+            change: 5
+        risk_level: safe
+        success_text: "They understand your preference."
+
+  - id: media-sponsorship-obligation
+    category: media
+    title: "Sponsor Media Event"
+    description_template: "A major sponsor wants key players and staff at a media event. It's important for the franchise but may distract the team."
+    conditions:
+      - type: phase
+        phases: ["season"]
+    target_player_conditions: []
+    weight: 6
+    cooldown_days: 21
+    urgency: end-of-day
+    options:
+      - id: full-participation
+        label: "Full participation"
+        description: "Honor the commitment with key personnel"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: -5
+          - target: team
+            attribute: board_patience
+            change: 10
+        risk_level: safe
+        success_text: "Sponsors are happy. Good for the franchise relationship."
+      - id: send-reserves
+        label: "Send reserve players"
+        description: "Protect key players from distractions"
+        effects:
+          - target: team
+            attribute: board_patience
+            change: -5
+        risk_level: moderate
+        success_text: "Key players appreciate being protected."
+        failure_text: "Sponsors are disappointed with the turnout."
+        success_chance: 0.5
+      - id: negotiate-timing
+        label: "Negotiate timing"
+        description: "Ask to reschedule to a more convenient time"
+        effects:
+          - target: team
+            attribute: board_patience
+            change: 5
+        risk_level: safe
+        success_text: "A better time is found that suits everyone."
+
+  - id: media-award-nomination
+    category: media
+    title: "Award Nomination"
+    description_template: "Your team has been nominated for a prestigious sports award. The ceremony is during the season."
+    conditions:
+      - type: phase
+        phases: ["season"]
+      - type: game_context
+        attribute: league_position
+        operator: le
+        value: 4
+    target_player_conditions: []
+    weight: 4
+    cooldown_days: 60
+    urgency: this-week
+    options:
+      - id: attend
+        label: "Attend the ceremony"
+        description: "Celebrate the recognition"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 10
+        risk_level: safe
+        success_text: "The recognition boosts team pride."
+      - id: send-representatives
+        label: "Send representatives"
+        description: "Have someone accept on behalf of the team"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 5
+        risk_level: safe
+        success_text: "The team is still acknowledged while staying focused."
+      - id: focus-on-cricket
+        label: "Politely decline"
+        description: "Stay focused on the season"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 5
+        risk_level: safe
+        success_text: "The gesture shows commitment to winning."
+
+  - id: media-book-deal
+    category: media
+    title: "Book Deal Offer"
+    description_template: "A publisher has approached you about writing a book about your coaching journey. It's flattering but potentially distracting."
+    conditions:
+      - type: phase
+        phases: ["off-season"]
+    target_player_conditions: []
+    weight: 2
+    cooldown_days: 60
+    urgency: this-week
+    options:
+      - id: accept-deal
+        label: "Accept the deal"
+        description: "Share your story with a wider audience"
+        effects:
+          - target: team
+            attribute: press_heat
+            change: 15
+        risk_level: moderate
+        success_text: "The book project begins in the off-season."
+      - id: postpone
+        label: "Postpone until retirement"
+        description: "Too early in your journey to reflect"
+        effects:
+          - target: team
+            attribute: press_heat
+            change: -5
+        risk_level: safe
+        success_text: "You keep focus on your coaching career."
+      - id: ghost-writer
+        label: "Suggest a ghost-writer"
+        description: "Minimize your time commitment"
+        effects: []
+        risk_level: safe
+        success_text: "An arrangement is made that works for everyone."

@@ -1,0 +1,1078 @@
+# Board Events - 22 templates
+# Categories: sponsor concerns, expectations, budget, owner interference, performance reviews
+
+templates:
+  # ============================================
+  # SPONSOR CONCERNS (5)
+  # ============================================
+  - id: board-sponsor-unhappy
+    category: board
+    title: "Sponsor Concerns"
+    description_template: "The title sponsor has expressed concerns about the team's performance. They're questioning the value of their investment."
+    conditions:
+      - type: phase
+        phases: ["season"]
+      - type: streak
+        streak_type: losing
+        operator: ge
+        value: 3
+      - type: none_of
+        conditions:
+          - type: streak
+            streak_type: winning
+            operator: ge
+            value: 2
+    target_player_conditions: []
+    weight: 10
+    cooldown_days: 14
+    urgency: immediate
+    options:
+      - id: reassure-sponsors
+        label: "Reassure sponsors"
+        description: "Meet with them and outline your plans"
+        effects:
+          - target: team
+            attribute: board_patience
+            change: 10
+        risk_level: safe
+        success_text: "The sponsors are somewhat reassured but will be watching closely."
+      - id: promise-improvement
+        label: "Promise rapid improvement"
+        description: "Commit to turning things around quickly"
+        effects:
+          - target: team
+            attribute: board_patience
+            change: -5
+        risk_level: risky
+        success_text: "They give you a short window to deliver."
+        failure_text: "If you don't improve, the pressure will intensify."
+        success_chance: 0.6
+      - id: highlight-exposure
+        label: "Highlight brand exposure"
+        description: "Point out the value they're getting regardless of results"
+        effects:
+          - target: team
+            attribute: board_patience
+            change: 5
+        risk_level: moderate
+        success_text: "They agree they're getting good exposure."
+        failure_text: "They wanted winning, not just visibility."
+        success_chance: 0.5
+
+  - id: board-sponsor-activation
+    category: board
+    title: "Sponsor Activation Request"
+    description_template: "A sponsor wants to run promotional activities that would require player time and access. The timing isn't ideal."
+    conditions:
+      - type: phase
+        phases: ["season"]
+    target_player_conditions: []
+    weight: 8
+    cooldown_days: 21
+    urgency: end-of-day
+    options:
+      - id: accommodate-fully
+        label: "Accommodate fully"
+        description: "Give them what they want"
+        effects:
+          - target: team
+            attribute: board_patience
+            change: 15
+          - target: team
+            attribute: team_morale
+            change: -10
+        risk_level: moderate
+        success_text: "Sponsors are happy, but players are fatigued."
+      - id: compromise
+        label: "Find a compromise"
+        description: "Offer limited access that protects players"
+        effects:
+          - target: team
+            attribute: board_patience
+            change: 5
+        risk_level: safe
+        success_text: "A workable arrangement is found."
+      - id: push-back
+        label: "Push back on timing"
+        description: "Protect the team's preparation time"
+        effects:
+          - target: team
+            attribute: board_patience
+            change: -10
+          - target: team
+            attribute: team_morale
+            change: 10
+        risk_level: risky
+        success_text: "The team appreciates being protected."
+        failure_text: "The board is unhappy with your stance."
+        success_chance: 0.5
+
+  - id: board-sponsor-conflict
+    category: board
+    title: "Sponsor Conflict"
+    description_template: "A player's personal sponsorship conflicts with the team's sponsor. The situation needs delicate handling."
+    conditions:
+      - type: phase
+        phases: ["season"]
+    target_player_conditions: []
+    weight: 5
+    cooldown_days: 30
+    urgency: this-week
+    options:
+      - id: back-team-sponsor
+        label: "Prioritize team sponsor"
+        description: "Ask player to limit conflicting activities"
+        effects:
+          - target: team
+            attribute: board_patience
+            change: 10
+          - target: player
+            attribute: morale
+            change: -15
+        risk_level: moderate
+        success_text: "Team sponsor is satisfied, player is unhappy."
+      - id: negotiate-solution
+        label: "Negotiate a solution"
+        description: "Find middle ground for both sponsors"
+        effects:
+          - target: team
+            attribute: board_patience
+            change: 5
+        risk_level: safe
+        success_text: "A creative solution satisfies everyone."
+      - id: support-player
+        label: "Support player's rights"
+        description: "Defend their personal sponsorship deal"
+        effects:
+          - target: team
+            attribute: board_patience
+            change: -15
+          - target: player
+            attribute: morale
+            change: 20
+        risk_level: risky
+        success_text: "The player is grateful for your support."
+        failure_text: "The board questions your priorities."
+        success_chance: 0.5
+
+  - id: board-sponsor-new-deal
+    category: board
+    title: "New Sponsorship Opportunity"
+    description_template: "A new sponsor wants to come on board, but they have specific requirements about team branding and player appearances."
+    conditions:
+      - type: phase
+        phases: ["pre-season", "off-season"]
+    target_player_conditions: []
+    weight: 5
+    cooldown_days: 60
+    urgency: this-week
+    options:
+      - id: accept-terms
+        label: "Accept their terms"
+        description: "Bring in the money despite conditions"
+        effects:
+          - target: team
+            attribute: board_patience
+            change: 15
+          - target: team
+            attribute: team_morale
+            change: -5
+        risk_level: moderate
+        success_text: "The deal is done. More resources for the franchise."
+      - id: negotiate-terms
+        label: "Negotiate better terms"
+        description: "Push back on onerous requirements"
+        effects:
+          - target: team
+            attribute: board_patience
+            change: 5
+        risk_level: moderate
+        success_text: "A better deal is struck."
+        failure_text: "They walk away from negotiations."
+        success_chance: 0.6
+      - id: decline
+        label: "Decline the offer"
+        description: "The conditions aren't acceptable"
+        effects:
+          - target: team
+            attribute: board_patience
+            change: -10
+        risk_level: risky
+        success_text: "You maintain team standards."
+        failure_text: "The board wanted that revenue."
+        success_chance: 0.4
+
+  - id: board-sponsor-satisfied
+    category: board
+    title: "Sponsor Praise"
+    description_template: "The main sponsor has expressed satisfaction with how the season is going. They're considering extending their deal."
+    conditions:
+      - type: phase
+        phases: ["season"]
+      - type: streak
+        streak_type: winning
+        operator: ge
+        value: 3
+      - type: game_context
+        attribute: league_position
+        operator: le
+        value: 4
+    target_player_conditions: []
+    weight: 8
+    cooldown_days: 21
+    urgency: end-of-day
+    options:
+      - id: maintain-momentum
+        label: "Promise to maintain momentum"
+        description: "Commit to keeping standards high"
+        effects:
+          - target: team
+            attribute: board_patience
+            change: 10
+        risk_level: safe
+        success_text: "They're pleased with your commitment."
+      - id: request-support
+        label: "Request more support"
+        description: "Use the goodwill to ask for more resources"
+        effects:
+          - target: team
+            attribute: board_patience
+            change: 5
+        risk_level: moderate
+        success_text: "They agree to discuss additional support."
+        failure_text: "They feel the relationship is being exploited."
+        success_chance: 0.6
+      - id: credit-players
+        label: "Credit the players"
+        description: "Deflect praise to the squad"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 10
+        risk_level: safe
+        success_text: "Everyone appreciates the recognition."
+
+  # ============================================
+  # BOARD EXPECTATIONS (5)
+  # ============================================
+  - id: board-expectations-meeting
+    category: board
+    title: "Board Meeting"
+    description_template: "The board has called a meeting to discuss expectations for the remainder of the season. They want answers."
+    conditions:
+      - type: phase
+        phases: ["season"]
+      - type: game_context
+        attribute: match_day
+        operator: ge
+        value: 7
+      - type: team_state
+        attribute: board_patience
+        operator: lt
+        value: 60
+    target_player_conditions: []
+    weight: 10
+    cooldown_days: 14
+    urgency: immediate
+    options:
+      - id: confident-plan
+        label: "Present a confident plan"
+        description: "Show them a clear path to improvement"
+        effects:
+          - target: team
+            attribute: board_patience
+            change: 15
+        risk_level: moderate
+        success_text: "They buy into your vision."
+        failure_text: "They've heard promises before."
+        success_chance: 0.6
+      - id: request-patience
+        label: "Request more patience"
+        description: "Ask for time to implement changes"
+        effects:
+          - target: team
+            attribute: board_patience
+            change: 5
+        risk_level: moderate
+        success_text: "They agree to give you more time."
+        failure_text: "Patience is running out."
+        success_chance: 0.5
+      - id: accept-criticism
+        label: "Accept their criticism"
+        description: "Acknowledge failings and commit to fixing them"
+        effects:
+          - target: team
+            attribute: board_patience
+            change: 10
+        risk_level: safe
+        success_text: "Your humility helps reset the relationship."
+
+  - id: board-expectations-playoff
+    category: board
+    title: "Playoff Mandate"
+    description_template: "The board has made clear that playoff qualification is the minimum expectation. Failure will have consequences."
+    conditions:
+      - type: phase
+        phases: ["season"]
+      - type: game_context
+        attribute: match_day
+        operator: ge
+        value: 5
+      - type: game_context
+        attribute: league_position
+        operator: gt
+        value: 4
+    target_player_conditions: []
+    weight: 8
+    cooldown_days: 21
+    urgency: end-of-day
+    options:
+      - id: accept-challenge
+        label: "Accept the challenge"
+        description: "Commit to achieving playoffs"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 10
+        risk_level: safe
+        success_text: "The team is motivated by the clear goal."
+      - id: lower-expectations
+        label: "Try to lower expectations"
+        description: "Explain the challenges you face"
+        effects:
+          - target: team
+            attribute: board_patience
+            change: -10
+        risk_level: risky
+        success_text: "They understand the difficulties."
+        failure_text: "They see this as making excuses."
+        success_chance: 0.3
+      - id: exceed-expectations
+        label: "Aim higher"
+        description: "Commit to winning the tournament"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 15
+          - target: team
+            attribute: board_patience
+            change: 5
+        risk_level: risky
+        success_text: "Your ambition impresses them."
+        failure_text: "If you fail, the fall will be harder."
+        success_chance: 0.6
+
+  - id: board-expectations-youth
+    category: board
+    title: "Youth Development Mandate"
+    description_template: "The board wants more young players developed and given opportunities. They see it as key to future success."
+    conditions:
+      - type: phase
+        phases: ["pre-season", "season"]
+    target_player_conditions: []
+    weight: 6
+    cooldown_days: 30
+    urgency: this-week
+    options:
+      - id: embrace-mandate
+        label: "Embrace the mandate"
+        description: "Commit to giving youth more chances"
+        effects:
+          - target: team
+            attribute: board_patience
+            change: 15
+        risk_level: moderate
+        success_text: "The board appreciates your buy-in."
+      - id: balance-approach
+        label: "Advocate for balance"
+        description: "Explain the need to mix youth and experience"
+        effects:
+          - target: team
+            attribute: board_patience
+            change: 5
+        risk_level: safe
+        success_text: "They accept a balanced approach."
+      - id: results-first
+        label: "Put results first"
+        description: "Argue that winning should be the priority"
+        effects:
+          - target: team
+            attribute: board_patience
+            change: -10
+        risk_level: risky
+        success_text: "They respect your focus on winning."
+        failure_text: "They feel you're ignoring the future."
+        success_chance: 0.4
+
+  - id: board-expectations-style
+    category: board
+    title: "Playing Style Discussion"
+    description_template: "The board has views on how the team should play. They want a more entertaining brand of cricket."
+    conditions:
+      - type: phase
+        phases: ["pre-season", "season"]
+    target_player_conditions: []
+    weight: 5
+    cooldown_days: 30
+    urgency: this-week
+    options:
+      - id: adapt-style
+        label: "Adapt to their vision"
+        description: "Modify approach to be more entertaining"
+        effects:
+          - target: team
+            attribute: board_patience
+            change: 15
+          - target: team
+            attribute: team_morale
+            change: -5
+        risk_level: moderate
+        success_text: "The team tries to play more expansively."
+      - id: defend-methods
+        label: "Defend your methods"
+        description: "Explain why your approach is best for this squad"
+        effects:
+          - target: team
+            attribute: board_patience
+            change: -5
+          - target: team
+            attribute: team_morale
+            change: 10
+        risk_level: moderate
+        success_text: "They accept your expertise."
+        failure_text: "They feel you're not listening to them."
+        success_chance: 0.5
+      - id: find-middle-ground
+        label: "Find middle ground"
+        description: "Incorporate some entertainment value"
+        effects:
+          - target: team
+            attribute: board_patience
+            change: 5
+        risk_level: safe
+        success_text: "A workable compromise is found."
+
+  - id: board-expectations-exceeded
+    category: board
+    title: "Expectations Exceeded"
+    description_template: "The board is thrilled with the team's performance. They want to discuss extending your contract."
+    conditions:
+      - type: phase
+        phases: ["season", "playoffs"]
+      - type: game_context
+        attribute: league_position
+        operator: le
+        value: 2
+      - type: streak
+        streak_type: winning
+        operator: ge
+        value: 3
+    target_player_conditions: []
+    weight: 8
+    cooldown_days: 30
+    urgency: this-week
+    options:
+      - id: discuss-extension
+        label: "Discuss extension"
+        description: "Explore a longer commitment"
+        effects:
+          - target: team
+            attribute: board_patience
+            change: 20
+        risk_level: safe
+        success_text: "Positive talks about your future at the franchise."
+      - id: focus-on-season
+        label: "Focus on finishing the season"
+        description: "Park contract talks until the job is done"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 10
+        risk_level: safe
+        success_text: "Your focus impresses them."
+      - id: request-resources
+        label: "Request more resources"
+        description: "Use your leverage to improve the setup"
+        effects:
+          - target: team
+            attribute: board_patience
+            change: 5
+        risk_level: moderate
+        success_text: "They agree to invest more in the squad."
+        failure_text: "They feel you're being opportunistic."
+        success_chance: 0.6
+
+  # ============================================
+  # BUDGET DISCUSSIONS (4)
+  # ============================================
+  - id: board-budget-cut
+    category: board
+    title: "Budget Reduction"
+    description_template: "The board has informed you that next season's budget will be reduced. You'll have to do more with less."
+    conditions:
+      - type: phase
+        phases: ["off-season"]
+    target_player_conditions: []
+    weight: 5
+    cooldown_days: 60
+    urgency: this-week
+    options:
+      - id: accept-challenge
+        label: "Accept the challenge"
+        description: "Commit to working within constraints"
+        effects:
+          - target: team
+            attribute: board_patience
+            change: 15
+        risk_level: safe
+        success_text: "They appreciate your professionalism."
+      - id: argue-for-more
+        label: "Argue for more resources"
+        description: "Make the case for why cuts will hurt performance"
+        effects:
+          - target: team
+            attribute: board_patience
+            change: -5
+        risk_level: moderate
+        success_text: "They restore some of the budget."
+        failure_text: "The decision stands."
+        success_chance: 0.4
+      - id: propose-alternatives
+        label: "Propose alternatives"
+        description: "Suggest other areas to cut instead"
+        effects:
+          - target: team
+            attribute: board_patience
+            change: 5
+        risk_level: safe
+        success_text: "They agree to review the cuts."
+
+  - id: board-budget-increase
+    category: board
+    title: "Budget Increase"
+    description_template: "Good news - the board is increasing your budget for next season. They want to know your priorities."
+    conditions:
+      - type: phase
+        phases: ["off-season"]
+      - type: game_context
+        attribute: league_position
+        operator: le
+        value: 4
+    target_player_conditions: []
+    weight: 5
+    cooldown_days: 60
+    urgency: this-week
+    options:
+      - id: big-signing
+        label: "Target a big signing"
+        description: "Use the money to bring in a star player"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 10
+        risk_level: moderate
+        success_text: "Plans are made for a marquee acquisition."
+      - id: squad-depth
+        label: "Build squad depth"
+        description: "Spread the investment across multiple signings"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 15
+        risk_level: safe
+        success_text: "A stronger, deeper squad is planned."
+      - id: facilities
+        label: "Invest in facilities"
+        description: "Upgrade training and medical facilities"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 5
+          - target: team
+            attribute: board_patience
+            change: 10
+        risk_level: safe
+        success_text: "Long-term infrastructure investment begins."
+
+  - id: board-budget-overspend
+    category: board
+    title: "Budget Overspend Concern"
+    description_template: "The finance team has flagged that you're at risk of overspending your allocation. The board wants an explanation."
+    conditions:
+      - type: phase
+        phases: ["season"]
+    target_player_conditions: []
+    weight: 5
+    cooldown_days: 30
+    urgency: immediate
+    options:
+      - id: justify-spending
+        label: "Justify the spending"
+        description: "Explain why the investment was necessary"
+        effects:
+          - target: team
+            attribute: board_patience
+            change: 5
+        risk_level: moderate
+        success_text: "They accept your reasoning."
+        failure_text: "They're still concerned about fiscal responsibility."
+        success_chance: 0.6
+      - id: cut-back
+        label: "Commit to cutting back"
+        description: "Reduce spending immediately"
+        effects:
+          - target: team
+            attribute: board_patience
+            change: 10
+          - target: team
+            attribute: team_morale
+            change: -5
+        risk_level: safe
+        success_text: "They appreciate the fiscal discipline."
+      - id: request-increase
+        label: "Request budget increase"
+        description: "Argue you need more to compete"
+        effects:
+          - target: team
+            attribute: board_patience
+            change: -10
+        risk_level: risky
+        success_text: "They agree to increase the budget."
+        failure_text: "Your request is denied and noted."
+        success_chance: 0.3
+
+  - id: board-budget-allocation
+    category: board
+    title: "Budget Allocation Review"
+    description_template: "The board wants to review how you've allocated the budget. They have questions about certain expenditures."
+    conditions:
+      - type: phase
+        phases: ["season", "off-season"]
+    target_player_conditions: []
+    weight: 5
+    cooldown_days: 30
+    urgency: this-week
+    options:
+      - id: transparent-breakdown
+        label: "Provide transparent breakdown"
+        description: "Show them exactly where every rupee went"
+        effects:
+          - target: team
+            attribute: board_patience
+            change: 10
+        risk_level: safe
+        success_text: "Your transparency builds trust."
+      - id: defend-decisions
+        label: "Defend your decisions"
+        description: "Explain the strategic thinking behind spending"
+        effects:
+          - target: team
+            attribute: board_patience
+            change: 5
+        risk_level: moderate
+        success_text: "They understand your rationale."
+        failure_text: "They question some decisions."
+        success_chance: 0.7
+      - id: acknowledge-mistakes
+        label: "Acknowledge some mistakes"
+        description: "Admit where you could have spent better"
+        effects:
+          - target: team
+            attribute: board_patience
+            change: 15
+        risk_level: safe
+        success_text: "Your honesty strengthens the relationship."
+
+  # ============================================
+  # OWNER INTERFERENCE (4)
+  # ============================================
+  - id: board-owner-selection
+    category: board
+    title: "Owner's Selection Input"
+    description_template: "The team owner has 'suggested' that a particular player should be in the playing XI. It's not really a suggestion."
+    conditions:
+      - type: phase
+        phases: ["season"]
+    target_player_conditions: []
+    weight: 6
+    cooldown_days: 21
+    urgency: immediate
+    options:
+      - id: comply
+        label: "Comply with the request"
+        description: "Include the player as requested"
+        effects:
+          - target: team
+            attribute: board_patience
+            change: 15
+          - target: team
+            attribute: team_morale
+            change: -10
+        risk_level: moderate
+        success_text: "The owner is happy, the team is puzzled."
+      - id: push-back
+        label: "Push back diplomatically"
+        description: "Explain your selection criteria professionally"
+        effects:
+          - target: team
+            attribute: board_patience
+            change: -10
+          - target: team
+            attribute: team_morale
+            change: 10
+        risk_level: risky
+        success_text: "They respect your stance on selection."
+        failure_text: "The owner is unhappy with your defiance."
+        success_chance: 0.4
+      - id: compromise
+        label: "Find a compromise"
+        description: "Promise to give the player chances soon"
+        effects:
+          - target: team
+            attribute: board_patience
+            change: 5
+        risk_level: safe
+        success_text: "The owner accepts the compromise."
+
+  - id: board-owner-tactics
+    category: board
+    title: "Owner's Tactical Input"
+    description_template: "The owner has been watching matches closely and has 'ideas' about tactics. They want to discuss them with you."
+    conditions:
+      - type: phase
+        phases: ["season"]
+    target_player_conditions: []
+    weight: 5
+    cooldown_days: 21
+    urgency: end-of-day
+    options:
+      - id: listen-politely
+        label: "Listen politely"
+        description: "Hear them out and acknowledge their points"
+        effects:
+          - target: team
+            attribute: board_patience
+            change: 10
+        risk_level: safe
+        success_text: "They feel heard and valued."
+      - id: incorporate-ideas
+        label: "Incorporate some ideas"
+        description: "Try some of their suggestions"
+        effects:
+          - target: team
+            attribute: board_patience
+            change: 15
+          - target: team
+            attribute: team_morale
+            change: -5
+        risk_level: moderate
+        success_text: "They're pleased to see their input valued."
+        failure_text: "The tactical changes cause confusion."
+        success_chance: 0.6
+      - id: maintain-autonomy
+        label: "Maintain tactical autonomy"
+        description: "Politely explain that tactics are your domain"
+        effects:
+          - target: team
+            attribute: board_patience
+            change: -15
+          - target: team
+            attribute: team_morale
+            change: 15
+        risk_level: risky
+        success_text: "They respect your expertise."
+        failure_text: "They feel dismissed."
+        success_chance: 0.4
+
+  - id: board-owner-dressing-room
+    category: board
+    title: "Owner Visits Dressing Room"
+    description_template: "The team owner wants to address the squad in the dressing room. This could go well or create pressure."
+    conditions:
+      - type: phase
+        phases: ["season"]
+    target_player_conditions: []
+    weight: 5
+    cooldown_days: 21
+    urgency: end-of-day
+    options:
+      - id: welcome-visit
+        label: "Welcome the visit"
+        description: "It shows the owner cares"
+        effects:
+          - target: team
+            attribute: board_patience
+            change: 10
+        risk_level: moderate
+        success_text: "The owner's pep talk motivates the team."
+        failure_text: "The speech adds pressure rather than inspiration."
+        success_chance: 0.6
+      - id: brief-owner
+        label: "Brief the owner first"
+        description: "Guide what they should say"
+        effects:
+          - target: team
+            attribute: board_patience
+            change: 5
+          - target: team
+            attribute: team_morale
+            change: 5
+        risk_level: safe
+        success_text: "A well-coordinated message is delivered."
+      - id: suggest-alternative
+        label: "Suggest alternative timing"
+        description: "Propose a better moment for the visit"
+        effects:
+          - target: team
+            attribute: board_patience
+            change: -5
+        risk_level: moderate
+        success_text: "They agree to visit at a better time."
+        failure_text: "They feel rebuffed."
+        success_chance: 0.5
+
+  - id: board-owner-celebration
+    category: board
+    title: "Owner Wants to Celebrate"
+    description_template: "After a big win, the owner wants to organize a lavish celebration. The timing might not be ideal."
+    conditions:
+      - type: phase
+        phases: ["season", "playoffs"]
+      - type: streak
+        streak_type: winning
+        operator: ge
+        value: 2
+    target_player_conditions: []
+    weight: 5
+    cooldown_days: 21
+    urgency: end-of-day
+    options:
+      - id: embrace-celebration
+        label: "Embrace the celebration"
+        description: "Let the team enjoy the moment"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 15
+          - target: team
+            attribute: board_patience
+            change: 10
+        risk_level: moderate
+        success_text: "A memorable celebration that bonds the team."
+        failure_text: "The celebration leads to complacency."
+        success_chance: 0.7
+      - id: tone-down
+        label: "Suggest toning it down"
+        description: "Keep celebrations measured during the season"
+        effects:
+          - target: team
+            attribute: board_patience
+            change: -5
+          - target: team
+            attribute: team_morale
+            change: 5
+        risk_level: moderate
+        success_text: "A modest but enjoyable celebration."
+        failure_text: "The owner feels you're a killjoy."
+        success_chance: 0.5
+      - id: postpone
+        label: "Postpone until season ends"
+        description: "Save the big celebration for when we've won"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 10
+        risk_level: safe
+        success_text: "The team focuses on finishing the job first."
+
+  # ============================================
+  # PERFORMANCE REVIEWS (4)
+  # ============================================
+  - id: board-review-mid-season
+    category: board
+    title: "Mid-Season Review"
+    description_template: "The board has called a formal mid-season review to assess progress and discuss the way forward."
+    conditions:
+      - type: phase
+        phases: ["season"]
+      - type: game_context
+        attribute: match_day
+        operator: ge
+        value: 7
+    target_player_conditions: []
+    weight: 8
+    cooldown_days: 30
+    urgency: immediate
+    options:
+      - id: comprehensive-report
+        label: "Present comprehensive report"
+        description: "Show them data and analysis"
+        effects:
+          - target: team
+            attribute: board_patience
+            change: 10
+        risk_level: safe
+        success_text: "Your thorough preparation impresses them."
+      - id: focus-positives
+        label: "Focus on positives"
+        description: "Highlight what's going well"
+        effects:
+          - target: team
+            attribute: board_patience
+            change: 5
+        risk_level: moderate
+        success_text: "A confident presentation."
+        failure_text: "They think you're ignoring problems."
+        success_chance: 0.6
+      - id: honest-assessment
+        label: "Give honest assessment"
+        description: "Be candid about strengths and weaknesses"
+        effects:
+          - target: team
+            attribute: board_patience
+            change: 15
+        risk_level: safe
+        success_text: "They appreciate your honesty."
+
+  - id: board-review-season-end
+    category: board
+    title: "Season-End Review"
+    description_template: "The board wants a comprehensive review of the season. Your future may depend on this meeting."
+    conditions:
+      - type: phase
+        phases: ["off-season"]
+    target_player_conditions: []
+    weight: 10
+    cooldown_days: 60
+    urgency: immediate
+    options:
+      - id: celebrate-positives
+        label: "Celebrate achievements"
+        description: "Highlight what went well"
+        effects:
+          - target: team
+            attribute: board_patience
+            change: 5
+        risk_level: moderate
+        success_text: "A balanced reflection on the season."
+      - id: learn-from-failures
+        label: "Learn from setbacks"
+        description: "Show how you'll improve next time"
+        effects:
+          - target: team
+            attribute: board_patience
+            change: 15
+        risk_level: safe
+        success_text: "Your growth mindset impresses them."
+      - id: present-next-plan
+        label: "Present next season's plan"
+        description: "Show them you're already thinking ahead"
+        effects:
+          - target: team
+            attribute: board_patience
+            change: 10
+        risk_level: safe
+        success_text: "They're excited about the future plans."
+
+  - id: board-vote-confidence
+    category: board
+    title: "Vote of Confidence"
+    description_template: "Despite recent struggles, the board has issued a public vote of confidence in your management."
+    conditions:
+      - type: phase
+        phases: ["season"]
+      - type: streak
+        streak_type: losing
+        operator: ge
+        value: 2
+      - type: team_state
+        attribute: board_patience
+        operator: ge
+        value: 40
+    target_player_conditions: []
+    weight: 5
+    cooldown_days: 30
+    urgency: immediate
+    options:
+      - id: appreciate-support
+        label: "Appreciate the support"
+        description: "Thank them and recommit to improvement"
+        effects:
+          - target: team
+            attribute: board_patience
+            change: 10
+          - target: team
+            attribute: team_morale
+            change: 10
+        risk_level: safe
+        success_text: "The public backing provides a boost."
+      - id: deliver-results
+        label: "Promise to deliver results"
+        description: "Make commitments you can keep"
+        effects:
+          - target: team
+            attribute: board_patience
+            change: -5
+          - target: team
+            attribute: team_morale
+            change: 15
+        risk_level: risky
+        success_text: "The pressure to deliver intensifies."
+      - id: stay-grounded
+        label: "Stay grounded"
+        description: "Focus on the work ahead"
+        effects:
+          - target: team
+            attribute: team_morale
+            change: 5
+        risk_level: safe
+        success_text: "You keep things in perspective."
+
+  - id: board-contract-extension
+    category: board
+    title: "Contract Extension Offer"
+    description_template: "The board is pleased with your work and wants to discuss extending your contract with improved terms."
+    conditions:
+      - type: phase
+        phases: ["season", "off-season"]
+      - type: team_state
+        attribute: board_patience
+        operator: ge
+        value: 70
+    target_player_conditions: []
+    weight: 5
+    cooldown_days: 60
+    urgency: this-week
+    options:
+      - id: negotiate-terms
+        label: "Negotiate terms"
+        description: "Discuss the details carefully"
+        effects:
+          - target: team
+            attribute: board_patience
+            change: 5
+        risk_level: safe
+        success_text: "Positive negotiations about your future."
+      - id: accept-offer
+        label: "Accept the offer"
+        description: "Commit to the franchise long-term"
+        effects:
+          - target: team
+            attribute: board_patience
+            change: 20
+          - target: team
+            attribute: team_morale
+            change: 10
+        risk_level: safe
+        success_text: "A new contract is signed. Stability assured."
+      - id: request-improvements
+        label: "Request squad improvements"
+        description: "Use your leverage to strengthen the team"
+        effects:
+          - target: team
+            attribute: board_patience
+            change: -5
+        risk_level: moderate
+        success_text: "They agree to invest in the squad."
+        failure_text: "They feel you're overreaching."
+        success_chance: 0.6
