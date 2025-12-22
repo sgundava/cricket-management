@@ -73,6 +73,19 @@ export const AuctionScreen = () => {
     }
   }, [auctionState, initializeAuction]);
 
+  // Auto-start bidding for mini auctions or when in bidding status with no current player
+  useEffect(() => {
+    if (
+      auctionState &&
+      auctionState.status === 'bidding' &&
+      !auctionState.currentPlayer &&
+      auctionState.auctionPool.some((p) => p.status === 'available')
+    ) {
+      // Call nextPlayer to get the first player
+      nextPlayer();
+    }
+  }, [auctionState, nextPlayer]);
+
   // Get current player details
   const currentAuctionPlayer = auctionState?.currentPlayer;
   const currentPlayer = currentAuctionPlayer
