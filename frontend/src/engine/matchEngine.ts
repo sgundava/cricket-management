@@ -315,7 +315,7 @@ const getBatsmanState = (ballsFaced: number): BatsmanState => {
   return 'set';
 };
 
-const getPhase = (over: number): MatchPhase => {
+export const getPhase = (over: number): MatchPhase => {
   if (over < 6) return 'powerplay';
   if (over < 16) return 'middle';
   return 'death';

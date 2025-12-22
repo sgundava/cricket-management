@@ -1,7 +1,11 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useGameStore } from '../store/gameStore';
-import { simulateOver, simulateSingleBall, generateDefaultTactics, selectSmartBowler } from '../engine/matchEngine';
+import { simulateOver as clientSimulateOver, simulateSingleBall, generateDefaultTactics, selectSmartBowler } from '../engine/matchEngine';
 import { InningsState, OverSummary, Player, MatchTactics, BallEvent, SerializedInningsState, BowlingLength, FieldSetting } from '../types';
+import {
+  simulateOver as backendSimulateOver,
+  isUsingBackend,
+} from '../services';
 
 // Bowling length options for live override
 const BOWLING_LENGTH_OPTIONS: { value: BowlingLength; label: string }[] = [
@@ -68,6 +72,9 @@ export const MatchLiveScreen = () => {
   const [recentBalls, setRecentBalls] = useState<BallEvent[]>([]);
   const [showNewBatsmanModal, setShowNewBatsmanModal] = useState(false);
   const [simMode, setSimMode] = useState<'ball' | 'over' | 'wicket' | 'auto'>('over');
+
+  // Loading state for async operations
+  const [isLoading, setIsLoading] = useState(false);
 
   // In-match tactical controls
   const [showTacticsPanel, setShowTacticsPanel] = useState(false);
@@ -198,9 +205,11 @@ export const MatchLiveScreen = () => {
     });
   }, [inningsState, currentInnings, firstInningsTotal, recentBalls, match?.id, matchEnded]);
 
-  // Simulate next over
-  const simulateNextOver = useCallback(() => {
-    if (!match || !inningsState || matchEnded) return;
+  // Simulate next over (async with backend fallback)
+  const simulateNextOver = useCallback(async () => {
+    if (!match || !inningsState || matchEnded || isLoading) return;
+
+    setIsLoading(true);
 
     const battingTeamId = inningsState.battingTeam;
     const bowlingTeamId = inningsState.bowlingTeam;
@@ -259,7 +268,10 @@ export const MatchLiveScreen = () => {
       }
     }
 
-    if (!bowler) return;
+    if (!bowler) {
+      setIsLoading(false);
+      return;
+    }
 
     const target = currentInnings === 2 ? firstInningsTotal + 1 : null;
 
@@ -268,14 +280,41 @@ export const MatchLiveScreen = () => {
       .map(id => battingTeamPlayers.find(p => p.id === id))
       .filter((p): p is Player => p !== undefined);
 
-    const { overSummary, updatedInnings } = simulateOver(
-      battingTeamInOrder,
-      bowler,
-      inningsState,
-      battingTactics,
-      match.pitch,
-      target
-    );
+    // Try backend simulation, fall back to client
+    let overSummary: OverSummary;
+    let updatedInnings: InningsState;
+
+    try {
+      const result = await backendSimulateOver({
+        battingTeam: battingTeamInOrder,
+        bowlingTeam: bowlingTeamPlayers.filter(p => bowlingTactics.playingXI.includes(p.id)),
+        bowler,
+        inningsState,
+        tactics: battingTactics,
+        pitch: match.pitch,
+        target,
+        bowlingLength: liveBowlingLength ?? undefined,
+        fieldSetting: liveFieldSetting ?? undefined,
+      });
+
+      overSummary = result.overSummary;
+      updatedInnings = result.updatedInnings;
+    } catch (error) {
+      // Fallback to client simulation
+      console.warn('Backend simulation failed, using client:', error);
+      const clientResult = clientSimulateOver(
+        battingTeamInOrder,
+        bowler,
+        inningsState,
+        battingTactics,
+        match.pitch,
+        target
+      );
+      overSummary = clientResult.overSummary;
+      updatedInnings = clientResult.updatedInnings;
+    }
+
+    setIsLoading(false);
 
     setLastOver(overSummary);
     setInningsState(updatedInnings);
@@ -509,7 +548,7 @@ export const MatchLiveScreen = () => {
         });
       }
     }
-  }, [match, inningsState, currentInnings, firstInningsTotal, matchEnded, homePlayers, awayPlayers, selectedNextBowler, playerTeamId]);
+  }, [match, inningsState, currentInnings, firstInningsTotal, matchEnded, homePlayers, awayPlayers, selectedNextBowler, playerTeamId, isLoading, liveBowlingLength, liveFieldSetting]);
 
   // Simulate next ball
   const simulateNextBall = useCallback(() => {
@@ -1501,17 +1540,18 @@ export const MatchLiveScreen = () => {
                   setSimMode('ball');
                   simulateNextBall();
                 }}
-                disabled={isSimulating}
-                className="flex-1 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 py-3 rounded-lg font-medium text-sm"
+                disabled={isSimulating || isLoading}
+                className={`flex-1 py-3 rounded-lg font-medium text-sm disabled:opacity-50
+                  ${isLoading ? 'bg-gray-600 animate-pulse' : 'bg-gray-700 hover:bg-gray-600'}`}
               >
-                Next Ball
+                {isLoading ? 'Simulating...' : 'Next Ball'}
               </button>
               <button
                 onClick={() => {
                   setSimMode('wicket');
                   setIsSimulating(true);
                 }}
-                disabled={isSimulating}
+                disabled={isSimulating || isLoading}
                 className="flex-1 bg-purple-700 hover:bg-purple-600 disabled:opacity-50 py-3 rounded-lg font-medium text-sm"
               >
                 Sim to Wicket
@@ -1525,7 +1565,8 @@ export const MatchLiveScreen = () => {
                   setSimMode('auto');
                   setIsSimulating(!isSimulating);
                 }}
-                className={`flex-1 py-3 rounded-lg font-medium transition-colors
+                disabled={isLoading}
+                className={`flex-1 py-3 rounded-lg font-medium transition-colors disabled:opacity-50
                   ${isSimulating
                     ? 'bg-yellow-600 hover:bg-yellow-700'
                     : 'bg-blue-600 hover:bg-blue-700'
@@ -1538,10 +1579,11 @@ export const MatchLiveScreen = () => {
                   setSimMode('over');
                   simulateNextOver();
                 }}
-                disabled={isSimulating}
-                className="flex-1 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 py-3 rounded-lg font-medium"
+                disabled={isSimulating || isLoading}
+                className={`flex-1 py-3 rounded-lg font-medium transition-colors disabled:opacity-50
+                  ${isLoading ? 'bg-gray-600 animate-pulse' : 'bg-gray-700 hover:bg-gray-600'}`}
               >
-                Next Over
+                {isLoading ? 'Simulating...' : 'Next Over'}
               </button>
             </div>
           </div>
