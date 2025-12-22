@@ -1,5 +1,6 @@
 """Event generation API endpoints."""
 
+import time
 from typing import Optional
 from fastapi import APIRouter, HTTPException, Query
 
@@ -12,6 +13,7 @@ from app.schemas.events import (
 )
 from app.events.event_engine import get_event_engine
 from app.events.event_loader import get_event_loader
+from app.logging_config import api_logger, generate_request_id
 
 router = APIRouter()
 
@@ -37,6 +39,8 @@ async def generate_event(
     - Recent events (cooldown prevention)
     """
     engine = get_event_engine()
+    request_id = generate_request_id()
+    start_time = time.time()
 
     # Convert category filter from enum to string if provided
     category_filter = None
@@ -55,7 +59,7 @@ async def generate_event(
     loader = get_event_loader()
     template_counts = loader.get_template_count()
 
-    return GenerateEventResponse(
+    response = GenerateEventResponse(
         event=event,
         debug={
             "template_counts": template_counts,
@@ -65,6 +69,26 @@ async def generate_event(
             "category_filter": category_filter,
         }
     )
+
+    # Log analytics data
+    duration_ms = (time.time() - start_time) * 1000
+    api_logger.log_analytics_event(
+        event_type="event_generated",
+        data={
+            "event_triggered": event is not None,
+            "event_id": event.id if event else None,
+            "event_category": event.category if event else None,
+            "event_title": event.title if event else None,
+            "force_trigger": force_trigger,
+            "category_filter": category_filter,
+            "game_phase": request.game_context.phase.value if request.game_context else None,
+            "team_morale": request.game_context.team_morale if request.game_context else None,
+            "duration_ms": round(duration_ms, 2),
+        },
+        request_id=request_id,
+    )
+
+    return response
 
 
 @router.post("/resolve", response_model=ResolveEventResponse)
@@ -79,6 +103,8 @@ async def resolve_event(request: ResolveEventRequest):
     - Optional follow-up event ID
     """
     engine = get_event_engine()
+    request_id = generate_request_id()
+    start_time = time.time()
 
     result = engine.resolve_event(
         event_id=request.event_id,
@@ -108,12 +134,28 @@ async def resolve_event(request: ResolveEventRequest):
         for eff in result["team_effects"]
     ]
 
-    return ResolveEventResponse(
+    response = ResolveEventResponse(
         player_effects=player_effects,
         team_effects=team_effects,
         narrative_result=result["narrative_result"],
         follow_up_event_id=None,  # Future: chain events
     )
+
+    # Log analytics data
+    duration_ms = (time.time() - start_time) * 1000
+    api_logger.log_analytics_event(
+        event_type="event_resolved",
+        data={
+            "event_id": request.event_id,
+            "chosen_option_id": request.chosen_option_id,
+            "player_effects_count": len(player_effects),
+            "team_effects_count": len(team_effects),
+            "duration_ms": round(duration_ms, 2),
+        },
+        request_id=request_id,
+    )
+
+    return response
 
 
 @router.get("/templates/count")
