@@ -27,8 +27,13 @@ npm-debug.log*
 .cache/
 .eslintcache
 
-# Internal docs
-CHANGELOG.md
-DESIGN.md
-BETA_POST.md
-FEEDBACK_FORM.md
+# Internal docs (all markdown files)
+*.md
+
+# AI/IDE config folders (keep out of version control)
+.ai/
+.claude/
+.cursor/
+
+# GitHub workflows (managed separately)
+.github/
