@@ -1,9 +1,8 @@
 """Match simulation API endpoints."""
 
-import time
 from typing import List, Optional
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException
 
 from app.schemas.match import (
     SimulateBallRequest,
@@ -24,7 +23,6 @@ from app.schemas.player import PlayerStats
 from app.schemas.common import MatchPhase
 from app.engine.match_engine import MatchEngine
 from app.engine.probability_model import get_probability_model
-from app.logging_config import api_logger, generate_request_id
 
 router = APIRouter()
 
@@ -49,8 +47,6 @@ async def simulate_ball(request: SimulateBallRequest):
     Returns the outcome, narrative, and updated state information.
     """
     engine = get_engine()
-    request_id = generate_request_id()
-    start_time = time.time()
 
     try:
         outcome, narrative, probs = engine.simulate_ball(
@@ -113,7 +109,7 @@ async def simulate_ball(request: SimulateBallRequest):
         pressure_level = engine.get_pressure_level(request.innings_state, request.target)
         momentum = engine.get_momentum(request.innings_state)
 
-        response = SimulateBallResponse(
+        return SimulateBallResponse(
             outcome=outcome,
             narrative=narrative,
             updated_state=UpdatedState(
@@ -134,35 +130,7 @@ async def simulate_ball(request: SimulateBallRequest):
             probabilities_used=probs if request.include_narrative else None,
         )
 
-        # Log analytics data
-        duration_ms = (time.time() - start_time) * 1000
-        api_logger.log_analytics_event(
-            event_type="ball_simulated",
-            data={
-                "outcome_type": outcome.type,
-                "runs": outcome.runs if hasattr(outcome, "runs") else 0,
-                "dismissal": outcome.dismissal_type if isinstance(outcome, WicketOutcome) else None,
-                "phase": request.match_phase.value if request.match_phase else "unknown",
-                "batting_approach": request.batting_tactics.approach.value if request.batting_tactics else None,
-                "bowling_length": request.bowling_tactics.length.value if request.bowling_tactics else None,
-                "score": f"{new_runs}/{new_wickets}",
-                "overs": f"{new_overs}.{new_balls}",
-                "target": request.target,
-                "striker_id": request.striker.id,
-                "bowler_id": request.bowler.id,
-                "duration_ms": round(duration_ms, 2),
-            },
-            request_id=request_id,
-        )
-
-        return response
-
     except Exception as e:
-        api_logger.log_analytics_event(
-            event_type="ball_simulation_error",
-            data={"error": str(e)},
-            request_id=request_id,
-        )
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -175,8 +143,6 @@ async def simulate_over(request: SimulateOverRequest):
     Returns the over summary, updated innings state, and narratives.
     """
     engine = get_engine()
-    request_id = generate_request_id()
-    start_time = time.time()
 
     # Find the bowler
     bowler = next(
@@ -207,7 +173,7 @@ async def simulate_over(request: SimulateOverRequest):
 
         narratives = [ball.narrative for ball in over_summary.balls]
 
-        response = SimulateOverResponse(
+        return SimulateOverResponse(
             over_summary=over_summary,
             updated_innings_state=updated_state,
             innings_complete=innings_complete,
@@ -215,34 +181,7 @@ async def simulate_over(request: SimulateOverRequest):
             recommended_next_bowler=recommended_bowler,
         )
 
-        # Log analytics data
-        duration_ms = (time.time() - start_time) * 1000
-        api_logger.log_analytics_event(
-            event_type="over_simulated",
-            data={
-                "over_number": over_summary.over_number,
-                "over_runs": over_summary.runs,
-                "over_wickets": over_summary.wickets,
-                "bowler_id": bowler.id,
-                "bowler_style": bowler.bowling_style.value if bowler.bowling_style else None,
-                "batting_approach": request.batting_tactics.approach.value if request.batting_tactics else None,
-                "bowling_length": request.bowling_tactics.length.value if request.bowling_tactics else None,
-                "score": f"{updated_state.runs}/{updated_state.wickets}",
-                "target": request.target,
-                "innings_complete": innings_complete,
-                "duration_ms": round(duration_ms, 2),
-            },
-            request_id=request_id,
-        )
-
-        return response
-
     except Exception as e:
-        api_logger.log_analytics_event(
-            event_type="over_simulation_error",
-            data={"error": str(e), "bowler_id": request.bowler_id},
-            request_id=request_id,
-        )
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -254,8 +193,6 @@ async def recommend_bowler(request: BowlerRecommendRequest):
     Analyzes available bowlers and returns the best choice with reasoning.
     """
     engine = get_engine()
-    request_id = generate_request_id()
-    start_time = time.time()
     phase = engine.get_phase(request.innings_state.overs)
 
     # Filter eligible bowlers
@@ -297,30 +234,11 @@ async def recommend_bowler(request: BowlerRecommendRequest):
         for a in analyses[1:4]  # Top 3 alternatives
     ]
 
-    response = BowlerRecommendResponse(
+    return BowlerRecommendResponse(
         recommended_bowler_id=best[0].id,
         reasoning=best[2],
         alternatives=alternatives,
     )
-
-    # Log analytics data
-    duration_ms = (time.time() - start_time) * 1000
-    api_logger.log_analytics_event(
-        event_type="bowler_recommended",
-        data={
-            "recommended_id": best[0].id,
-            "recommended_style": best[0].bowling_style.value if best[0].bowling_style else None,
-            "phase": phase.value,
-            "score": f"{request.innings_state.runs}/{request.innings_state.wickets}",
-            "overs": request.innings_state.overs,
-            "partnership_runs": request.match_context.partnership_runs if request.match_context else 0,
-            "eligible_bowlers": len(eligible),
-            "duration_ms": round(duration_ms, 2),
-        },
-        request_id=request_id,
-    )
-
-    return response
 
 
 def _recommend_next_bowler(

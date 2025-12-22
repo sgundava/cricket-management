@@ -1,15 +1,12 @@
 """FastAPI application entry point."""
 
-import time
-from typing import Callable
-
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from starlette.middleware.base import BaseHTTPMiddleware
+from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
 
 from app.config import get_settings
 from app.api.v1.router import api_router
-from app.logging_config import api_logger, generate_request_id
 
 settings = get_settings()
 
@@ -22,65 +19,18 @@ app = FastAPI(
 )
 
 
-class RequestLoggingMiddleware(BaseHTTPMiddleware):
-    """Middleware to log all API requests and responses with payloads."""
-
-    async def dispatch(self, request: Request, call_next: Callable) -> Response:
-        # Skip logging for health checks and docs
-        if request.url.path in ("/health", "/", "/docs", "/redoc", "/openapi.json"):
-            return await call_next(request)
-
-        request_id = generate_request_id()
-        start_time = time.time()
-
-        # Read and log request payload for POST requests
-        payload = None
-        if request.method == "POST":
-            try:
-                body = await request.body()
-                if body:
-                    import json
-                    payload = json.loads(body)
-            except Exception:
-                payload = {"_error": "Could not parse request body"}
-
-        api_logger.log_request(
-            request_id=request_id,
-            endpoint=request.url.path,
-            method=request.method,
-            payload=payload,
-        )
-
-        # Process request
-        try:
-            response = await call_next(request)
-            duration_ms = (time.time() - start_time) * 1000
-
-            # For successful responses, we'd need to read the body
-            # but that requires more complex handling - log status only
-            api_logger.log_response(
-                request_id=request_id,
-                endpoint=request.url.path,
-                status_code=response.status_code,
-                duration_ms=duration_ms,
-            )
-
-            return response
-
-        except Exception as e:
-            duration_ms = (time.time() - start_time) * 1000
-            api_logger.log_response(
-                request_id=request_id,
-                endpoint=request.url.path,
-                status_code=500,
-                duration_ms=duration_ms,
-                error=str(e),
-            )
-            raise
-
-
-# Add logging middleware first (outermost)
-app.add_middleware(RequestLoggingMiddleware)
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """Return detailed validation errors for debugging."""
+    errors = exc.errors()
+    # Print to console for debugging
+    print(f"Validation error on {request.url.path}:")
+    for error in errors:
+        print(f"  - {error['loc']}: {error['msg']} (type: {error['type']})")
+    return JSONResponse(
+        status_code=422,
+        content={"detail": errors},
+    )
 
 # CORS middleware
 app.add_middleware(
