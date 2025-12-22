@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { formatSaveDate } from '../utils/saveManager';
+import { checkBackendHealth, getBackendStatus } from '../services/api/client';
 
 export const GlobalMenu = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -11,6 +12,24 @@ export const GlobalMenu = () => {
 
   const [copiedId, setCopiedId] = useState(false);
   const [confirmNewGame, setConfirmNewGame] = useState(false);
+
+  // Backend connection status
+  const [backendConnected, setBackendConnected] = useState(false);
+  const [lastChecked, setLastChecked] = useState<Date | null>(null);
+
+  // Check backend health on mount and periodically
+  useEffect(() => {
+    const checkConnection = async () => {
+      await checkBackendHealth();
+      const status = getBackendStatus();
+      setBackendConnected(status.connected);
+      setLastChecked(new Date());
+    };
+
+    checkConnection();
+    const interval = setInterval(checkConnection, 30000); // Check every 30s
+    return () => clearInterval(interval);
+  }, []);
 
   const {
     initialized,
@@ -114,15 +133,35 @@ export const GlobalMenu = () => {
 
   return (
     <>
-      {/* Hamburger Button */}
-      <button
-        onClick={() => setIsOpen(true)}
-        className="fixed top-4 right-4 z-50 w-10 h-10 rounded-lg bg-gray-800 border border-gray-700
-          flex items-center justify-center hover:bg-gray-700 transition-colors shadow-lg"
-        title="Menu"
-      >
-        <span className="text-xl text-gray-300">&#9776;</span>
-      </button>
+      {/* Hamburger Button with Connection Status */}
+      <div className="fixed top-4 right-4 z-50 flex items-center gap-2">
+        {/* Connection Status Indicator */}
+        <div
+          className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+            backendConnected
+              ? 'bg-green-900/80 text-green-400 border border-green-700/50'
+              : 'bg-amber-900/80 text-amber-400 border border-amber-700/50'
+          }`}
+          title={backendConnected ? 'Connected to backend server' : 'Using offline simulation'}
+        >
+          <span className={`w-2 h-2 rounded-full ${
+            backendConnected ? 'bg-green-400 animate-pulse' : 'bg-amber-400'
+          }`} />
+          <span className="hidden sm:inline">
+            {backendConnected ? 'Online' : 'Offline'}
+          </span>
+        </div>
+
+        {/* Menu Button */}
+        <button
+          onClick={() => setIsOpen(true)}
+          className="w-10 h-10 rounded-lg bg-gray-800 border border-gray-700
+            flex items-center justify-center hover:bg-gray-700 transition-colors shadow-lg"
+          title="Menu"
+        >
+          <span className="text-xl text-gray-300">&#9776;</span>
+        </button>
+      </div>
 
       {/* Overlay + Panel */}
       {isOpen && (
@@ -152,6 +191,40 @@ export const GlobalMenu = () => {
               >
                 &times;
               </button>
+            </div>
+
+            {/* Connection Status */}
+            <div className={`px-4 py-3 text-sm border-b ${
+              backendConnected
+                ? 'bg-green-900/30 border-green-800/50'
+                : 'bg-amber-900/30 border-amber-800/50'
+            }`}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className={`w-2.5 h-2.5 rounded-full ${
+                    backendConnected ? 'bg-green-400 animate-pulse' : 'bg-amber-400'
+                  }`} />
+                  <span className={backendConnected ? 'text-green-400' : 'text-amber-400'}>
+                    {backendConnected ? 'Backend Connected' : 'Offline Mode'}
+                  </span>
+                </div>
+                <button
+                  onClick={async () => {
+                    await checkBackendHealth();
+                    const status = getBackendStatus();
+                    setBackendConnected(status.connected);
+                    setLastChecked(new Date());
+                  }}
+                  className="text-xs text-gray-500 hover:text-gray-300 px-2 py-1 rounded bg-gray-800/50"
+                >
+                  Refresh
+                </button>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                {backendConnected
+                  ? 'Using server for match & event simulation'
+                  : 'Using local engine (start backend for full features)'}
+              </p>
             </div>
 
             {/* Current Status */}
