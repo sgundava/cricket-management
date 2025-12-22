@@ -44,6 +44,20 @@ import type {
 // ============================================
 
 /**
+ * Clamp a value to 0-100 range (for skill/state values)
+ */
+function clamp0to100(value: number): number {
+  return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+/**
+ * Clamp form to -20 to 20 range
+ */
+function clampForm(value: number): number {
+  return Math.max(-20, Math.min(20, Math.round(value)));
+}
+
+/**
  * Convert frontend Player to backend PlayerStats
  */
 export function toApiPlayerStats(player: Player): ApiPlayerStats {
@@ -57,35 +71,35 @@ export function toApiPlayerStats(player: Player): ApiPlayerStats {
     bowling_style: player.bowlingStyle ?? null,
 
     batting: {
-      technique: player.batting.technique,
-      power: player.batting.power,
-      timing: player.batting.timing,
-      temperament: player.batting.temperament,
+      technique: clamp0to100(player.batting.technique),
+      power: clamp0to100(player.batting.power),
+      timing: clamp0to100(player.batting.timing),
+      temperament: clamp0to100(player.batting.temperament),
     },
     bowling: {
-      speed: player.bowling.speed,
-      accuracy: player.bowling.accuracy,
-      variation: player.bowling.variation,
-      stamina: player.bowling.stamina,
+      speed: clamp0to100(player.bowling.speed),
+      accuracy: clamp0to100(player.bowling.accuracy),
+      variation: clamp0to100(player.bowling.variation),
+      stamina: clamp0to100(player.bowling.stamina),
     },
     fielding: {
-      catching: player.fielding.catching,
-      ground: player.fielding.ground,
-      throwing: player.fielding.throwing,
-      athleticism: player.fielding.athleticism,
+      catching: clamp0to100(player.fielding.catching),
+      ground: clamp0to100(player.fielding.ground),
+      throwing: clamp0to100(player.fielding.throwing),
+      athleticism: clamp0to100(player.fielding.athleticism),
     },
 
-    form: player.form,
-    fitness: player.fitness,
-    morale: player.morale,
-    fatigue: player.fatigue,
+    form: clampForm(player.form),
+    fitness: clamp0to100(player.fitness),
+    morale: clamp0to100(player.morale),
+    fatigue: clamp0to100(player.fatigue),
 
     personality: player.personality
       ? {
           temperament: player.personality.temperament,
-          professionalism: player.personality.professionalism,
-          ambition: player.personality.ambition,
-          leadership: player.personality.leadership,
+          professionalism: clamp0to100(player.personality.professionalism),
+          ambition: clamp0to100(player.personality.ambition),
+          leadership: clamp0to100(player.personality.leadership),
         }
       : null,
   };
@@ -96,41 +110,46 @@ export function toApiPlayerStats(player: Player): ApiPlayerStats {
  * Note: Maps are converted to plain objects
  */
 export function toApiInningsState(state: InningsState): ApiInningsState {
-  // Convert Map to Record
+  // Convert Map to Record - ensure all values are integers
   const batterStats: Record<string, ApiBatterStats> = {};
   state.batterStats.forEach((stats, playerId) => {
     batterStats[playerId] = {
-      runs: stats.runs,
-      balls: stats.balls,
-      fours: stats.fours,
-      sixes: stats.sixes,
+      runs: Math.floor(stats.runs),
+      balls: Math.floor(stats.balls),
+      fours: Math.floor(stats.fours),
+      sixes: Math.floor(stats.sixes),
     };
   });
 
   const bowlerStats: Record<string, ApiBowlerStats> = {};
   state.bowlerStats.forEach((stats, playerId) => {
     bowlerStats[playerId] = {
-      overs: stats.overs,
-      runs: stats.runs,
-      wickets: stats.wickets,
-      dots: stats.dots,
+      overs: Math.floor(stats.overs), // Backend expects int
+      runs: Math.floor(stats.runs),
+      wickets: Math.floor(stats.wickets),
+      dots: Math.floor(stats.dots),
     };
   });
+
+  // Calculate balls in current over from fractional overs
+  // e.g., 7.3 -> 3 balls, 7.0 -> 0 balls
+  const completedOvers = Math.floor(state.overs);
+  const ballsInCurrentOver = Math.round((state.overs - completedOvers) * 10);
 
   return {
     batting_team: state.battingTeam,
     bowling_team: state.bowlingTeam,
-    runs: state.runs,
-    wickets: state.wickets,
-    overs: Math.floor(state.overs), // Backend expects complete overs as int
-    balls: state.balls % 6, // Balls in current over (0-5)
+    runs: Math.floor(state.runs),
+    wickets: Math.floor(state.wickets),
+    overs: completedOvers, // Backend expects complete overs as int
+    balls: Math.min(5, Math.max(0, ballsInCurrentOver)), // Clamp to 0-5
     current_batters: state.currentBatters,
     current_bowler: state.currentBowler,
     over_summaries: state.overSummaries.map(toApiOverSummary),
     fall_of_wickets: state.fallOfWickets.map((fow) => ({
       player: fow.player,
-      runs: fow.runs,
-      overs: fow.overs,
+      runs: Math.floor(fow.runs),
+      overs: fow.overs, // This is a float in backend
     })),
     batter_stats: batterStats,
     bowler_stats: bowlerStats,
