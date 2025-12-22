@@ -160,16 +160,26 @@ const BATSMAN_STATE_MODIFIERS: Record<BatsmanState, {
   },
 };
 
-// Pressure and momentum system
+// Pressure and momentum system - DATA-DERIVED from IPL analysis
 interface MatchContext {
   recentWickets: number;      // Wickets in last 3 overs
   bowlerWickets: number;      // Wickets by current bowler this innings
   recentRunRate: number;      // Run rate in last 3 overs
   partnershipRuns: number;    // Current partnership runs
+  // NEW: Momentum metrics (from last 6 balls)
+  recentRuns: number;         // Runs in last 6 balls
+  recentBoundaries: number;   // Boundaries (4s + 6s) in last 6 balls
+  recentDots: number;         // Dot balls in last 6 balls
 }
 
-// Pressure modifiers based on match context
-// Very subtle effects - cricket is unpredictable, don't over-engineer
+// IPL-derived spell patterns for AI bowler selection
+const SPELL_PATTERNS = {
+  pace: { powerplay: 0.495, middle: 0.274, death: 0.231 },
+  spin: { powerplay: 0.228, middle: 0.659, death: 0.113 },
+};
+
+// Pressure modifiers based on match context - DATA-DERIVED FROM IPL ANALYSIS
+// Key insight: After 3+ wickets, batters are 54% more likely to get out (pressure compounds)
 const getPressureModifiers = (context: MatchContext): {
   boundaryMod: number;
   wicketMod: number;
@@ -179,38 +189,117 @@ const getPressureModifiers = (context: MatchContext): {
   let wicketMod = 1.0;
   let dotMod = 1.0;
 
-  // Recent wickets - batters consolidate (fewer boundaries, NOT more wickets)
+  // Recent wickets in last 3 overs - KEY FOR COLLAPSE PREVENTION (IPL-derived)
+  // After 3+ wickets, wicket probability increases 54%!
   if (context.recentWickets >= 3) {
-    boundaryMod *= 0.9;
-    dotMod *= 1.05;
-    // No wicket modifier - consolidation means safer play
-  } else if (context.recentWickets >= 2) {
-    boundaryMod *= 0.95;
+    boundaryMod *= 0.738;   // Full survival mode
+    wicketMod *= 1.38;      // 38% more wicket risk (dampened from 54% to prevent excessive cascading)
+    dotMod *= 1.096;
+  } else if (context.recentWickets === 2) {
+    boundaryMod *= 0.834;   // Significant consolidation
+    wicketMod *= 1.12;      // 12% more wicket risk (dampened from 16%)
+    dotMod *= 1.054;
+  } else if (context.recentWickets === 1) {
+    boundaryMod *= 0.935;   // Slight caution
+    wicketMod *= 1.026;
+    dotMod *= 0.967;
+  } else {
+    boundaryMod *= 1.058;   // Batters attack freely when stable
+    wicketMod *= 0.958;
+    dotMod *= 1.008;
   }
 
-  // Bowler on a roll - batters respect them (fewer boundaries)
+  // Bowler on a roll - psychological pressure
   if (context.bowlerWickets >= 3) {
     boundaryMod *= 0.92;
+    wicketMod *= 1.10;
   } else if (context.bowlerWickets >= 2) {
     boundaryMod *= 0.96;
+    wicketMod *= 1.05;
   }
 
-  // Momentum from recent scoring - confidence boost
-  if (context.recentRunRate >= 10) {
-    boundaryMod *= 1.1;
-    wicketMod *= 0.95;  // Confidence = better shot selection
-  } else if (context.recentRunRate >= 8) {
-    boundaryMod *= 1.05;
-    wicketMod *= 0.98;
-  }
-
-  // Established partnership builds confidence
-  if (context.partnershipRuns >= 50) {
-    boundaryMod *= 1.08;
-    wicketMod *= 0.92;  // Set batters less likely to make mistakes
+  // Partnership dynamics - DATA-DERIVED
+  // Early partnerships are SAFEST, then risk increases as batters attack
+  if (context.partnershipRuns >= 100) {
+    boundaryMod *= 1.424;   // Carnage mode
+    wicketMod *= 1.233;
+    dotMod *= 0.572;
+  } else if (context.partnershipRuns >= 75) {
+    boundaryMod *= 1.210;   // Dominant
+    wicketMod *= 1.178;
+    dotMod *= 0.624;
+  } else if (context.partnershipRuns >= 50) {
+    boundaryMod *= 1.143;   // Established
+    wicketMod *= 1.111;
+    dotMod *= 0.732;
   } else if (context.partnershipRuns >= 30) {
-    boundaryMod *= 1.04;
-    wicketMod *= 0.96;
+    boundaryMod *= 1.188;   // Attacking freely
+    wicketMod *= 1.056;
+    dotMod *= 0.811;
+  } else if (context.partnershipRuns >= 20) {
+    boundaryMod *= 1.130;   // Building momentum
+    wicketMod *= 1.037;
+    dotMod *= 0.870;
+  } else if (context.partnershipRuns >= 10) {
+    boundaryMod *= 1.071;   // Opening up
+    wicketMod *= 1.017;
+    dotMod *= 0.957;
+  } else {
+    boundaryMod *= 0.816;   // Conservative start - SAFEST period!
+    wicketMod *= 0.925;
+    dotMod *= 1.202;
+  }
+
+  // Momentum modifiers - DATA-DERIVED (boundaries breed boundaries)
+  // By recent runs in last 6 balls
+  if (context.recentRuns >= 15) {
+    boundaryMod *= 1.345;   // Hot streak - 35% more boundaries!
+    wicketMod *= 1.227;
+  } else if (context.recentRuns >= 8) {
+    boundaryMod *= 1.080;   // Building momentum
+    wicketMod *= 1.049;
+  } else if (context.recentRuns >= 3) {
+    boundaryMod *= 0.911;   // Normal flow
+    wicketMod *= 0.959;
+  } else {
+    boundaryMod *= 0.819;   // Low momentum
+    wicketMod *= 0.831;
+  }
+
+  // Boundary bursts - boundaries breed boundaries
+  if (context.recentBoundaries >= 3) {
+    boundaryMod *= 1.334;   // On fire - 33% more boundaries!
+    wicketMod *= 1.128;
+  } else if (context.recentBoundaries === 2) {
+    boundaryMod *= 1.143;   // Warming up
+    wicketMod *= 1.018;
+  } else if (context.recentBoundaries === 1) {
+    boundaryMod *= 1.001;   // Neutral
+    wicketMod *= 1.018;
+  } else {
+    boundaryMod *= 0.858;   // Cold
+    wicketMod *= 0.947;
+  }
+
+  // Dot ball pressure - consecutive dots make batters nervous
+  if (context.recentDots >= 5) {
+    boundaryMod *= 0.865;   // Strangled
+    wicketMod *= 0.889;     // But actually safer - playing careful
+  } else if (context.recentDots === 4) {
+    boundaryMod *= 0.917;   // Mounting pressure
+    wicketMod *= 0.894;
+  } else if (context.recentDots === 3) {
+    boundaryMod *= 0.950;
+    wicketMod *= 0.971;
+  } else if (context.recentDots === 2) {
+    boundaryMod *= 1.016;   // Starting to feel pressure
+    wicketMod *= 1.005;
+  } else if (context.recentDots === 1) {
+    boundaryMod *= 1.068;
+    wicketMod *= 1.069;
+  } else {
+    boundaryMod *= 1.080;   // Flowing
+    wicketMod *= 1.078;
   }
 
   return { boundaryMod, wicketMod, dotMod };
@@ -250,9 +339,9 @@ const calculateMatchContext = (
 
   // Calculate recent run rate from over summaries (last 3 overs)
   const recentOvers = inningsState.overSummaries.slice(-3);
-  const recentRuns = recentOvers.reduce((sum, os) => sum + os.runs, 0);
+  const oversRuns = recentOvers.reduce((sum, os) => sum + os.runs, 0);
   const recentOversCount = recentOvers.length || 1;
-  const recentRunRate = (recentRuns / recentOversCount) * 6 / 6; // Convert to per-over rate
+  const recentRunRate = (oversRuns / recentOversCount) * 6 / 6; // Convert to per-over rate
 
   // Calculate current partnership runs
   // Partnership is runs since last wicket
@@ -261,11 +350,42 @@ const calculateMatchContext = (
     ? inningsState.runs - lastWicket.runs
     : inningsState.runs; // If no wicket yet, partnership is total runs
 
+  // Calculate momentum metrics from last 6 balls (1 over)
+  // Extract recent balls from over summaries
+  const allBalls: BallEvent[] = [];
+  for (const over of inningsState.overSummaries) {
+    allBalls.push(...over.balls);
+  }
+  const last6Balls = allBalls.slice(-6);
+
+  let recentRuns = 0;
+  let recentBoundaries = 0;
+  let recentDots = 0;
+
+  for (const ball of last6Balls) {
+    const outcome = ball.outcome;
+    if (outcome.type === 'runs') {
+      recentRuns += outcome.runs;
+      if (outcome.runs === 0) {
+        recentDots++;
+      } else if (outcome.runs === 4 || outcome.runs === 6) {
+        recentBoundaries++;
+      }
+    } else if (outcome.type === 'wicket') {
+      recentRuns += outcome.runs;
+    } else if (outcome.type === 'extra') {
+      recentRuns += outcome.runs;
+    }
+  }
+
   return {
     recentWickets,
     bowlerWickets,
     recentRunRate,
     partnershipRuns,
+    recentRuns,
+    recentBoundaries,
+    recentDots,
   };
 };
 
@@ -1404,10 +1524,24 @@ export const selectSmartBowler = (
     // Calculate selection score
     let score = 50; // Base score
 
-    // Phase matching bonus
-    if (phase === 'powerplay' && role === 'powerplay') score += 20;
-    if (phase === 'middle' && role === 'middle') score += 20;
-    if (phase === 'death' && role === 'death') score += 25;
+    // IPL-derived phase matching using spell patterns
+    // Pace bowlers: 50% PP, 27% middle, 23% death
+    // Spin bowlers: 23% PP, 66% middle, 11% death
+    const isPace = bowler.bowlingStyle?.includes('fast') || bowler.bowlingStyle?.includes('medium');
+    const isSpin = bowler.bowlingStyle?.includes('spin') || bowler.bowlingStyle?.includes('leg');
+
+    if (isPace) {
+      const phaseWeight = SPELL_PATTERNS.pace[phase];
+      score += phaseWeight * 50; // Max ~25 for powerplay
+    } else if (isSpin) {
+      const phaseWeight = SPELL_PATTERNS.spin[phase];
+      score += phaseWeight * 50; // Max ~33 for middle overs
+    } else {
+      // Legacy role-based matching for untyped bowlers
+      if (phase === 'powerplay' && role === 'powerplay') score += 20;
+      if (phase === 'middle' && role === 'middle') score += 20;
+      if (phase === 'death' && role === 'death') score += 25;
+    }
 
     // Hot bowler bonus (partnership breaker)
     if (isHot) {

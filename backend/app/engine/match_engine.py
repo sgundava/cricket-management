@@ -58,6 +58,35 @@ class MatchEngine:
             return MatchPhase.MIDDLE
         return MatchPhase.DEATH
 
+    def _calculate_recent_ball_stats(
+        self,
+        recent_balls: List[BallEvent]
+    ) -> Tuple[int, int, int]:
+        """
+        Calculate momentum stats from recent balls (last 6 legal deliveries).
+
+        Returns:
+            Tuple of (recent_runs, recent_boundaries, recent_dots)
+        """
+        recent_runs = 0
+        recent_boundaries = 0
+        recent_dots = 0
+
+        for ball in recent_balls[-6:]:  # Last 6 balls
+            outcome = ball.outcome
+            if isinstance(outcome, RunsOutcome):
+                recent_runs += outcome.runs
+                if outcome.runs == 0:
+                    recent_dots += 1
+                elif outcome.runs in (4, 6):
+                    recent_boundaries += 1
+            elif isinstance(outcome, WicketOutcome):
+                recent_runs += outcome.runs
+            elif isinstance(outcome, ExtraOutcome):
+                recent_runs += outcome.runs
+
+        return recent_runs, recent_boundaries, recent_dots
+
     def simulate_ball(
         self,
         striker: PlayerStats,
@@ -97,6 +126,11 @@ class MatchEngine:
         bowler_stats = innings_state.bowler_stats.get(bowler.id, BowlerStats())
         bowler_wickets = bowler_stats.wickets
 
+        # Calculate momentum metrics from recent balls
+        recent_runs, recent_boundaries, recent_dots = self._calculate_recent_ball_stats(
+            innings_state.recent_balls
+        )
+
         # Build simulation context
         ctx = SimulationContext(
             striker=striker,
@@ -113,6 +147,9 @@ class MatchEngine:
             partnership_runs=partnership_runs,
             recent_wickets=recent_wickets,
             bowler_wickets=bowler_wickets,
+            recent_runs=recent_runs,
+            recent_boundaries=recent_boundaries,
+            recent_dots=recent_dots,
         )
 
         # Calculate probabilities

@@ -34,6 +34,9 @@ class SimulationContext:
     partnership_runs: int = 0
     recent_wickets: int = 0  # In last 3 overs
     bowler_wickets: int = 0  # By current bowler this innings
+    recent_runs: int = 0  # Runs in last 6 balls (for momentum)
+    recent_boundaries: int = 0  # Boundaries in last 6 balls
+    recent_dots: int = 0  # Dots in last 6 balls
 
 
 class ProbabilityModel:
@@ -231,40 +234,130 @@ class ProbabilityModel:
         probs: Dict[str, float],
         ctx: SimulationContext
     ) -> Dict[str, float]:
-        """Apply pressure/momentum modifiers."""
+        """Apply pressure/momentum modifiers based on IPL data analysis."""
         result = dict(probs)
         pressure = self.params["pressure"]
 
-        # Recent wickets
+        # Recent wickets in last 3 overs - KEY FOR COLLAPSE PREVENTION
+        # Data shows 3+ wickets creates 54% more wicket risk
+        recent_wickets_config = pressure.get("recent_wickets", {})
         if ctx.recent_wickets >= 3:
-            mods = pressure["recent_wickets"]["3"]
+            mods = recent_wickets_config.get(3, recent_wickets_config.get("3", {}))
+        elif ctx.recent_wickets == 2:
+            mods = recent_wickets_config.get(2, recent_wickets_config.get("2", {}))
+        elif ctx.recent_wickets == 1:
+            mods = recent_wickets_config.get(1, recent_wickets_config.get("1", {}))
+        else:
+            mods = recent_wickets_config.get(0, recent_wickets_config.get("0", {}))
+
+        if mods:
             result["four"] *= mods.get("boundary_mod", 1.0)
             result["six"] *= mods.get("boundary_mod", 1.0)
+            result["wicket"] *= mods.get("wicket_mod", 1.0)
             result["dot"] *= mods.get("dot_mod", 1.0)
-        elif ctx.recent_wickets >= 2:
-            mods = pressure["recent_wickets"]["2"]
-            result["four"] *= mods.get("boundary_mod", 1.0)
-            result["six"] *= mods.get("boundary_mod", 1.0)
 
         # Bowler on a roll
+        bowler_roll = pressure.get("bowler_on_roll", {})
         if ctx.bowler_wickets >= 3:
-            result["four"] *= pressure["bowler_on_roll"]["3_wickets"]["boundary_mod"]
-            result["six"] *= pressure["bowler_on_roll"]["3_wickets"]["boundary_mod"]
+            mods = bowler_roll.get("3_wickets", {})
+            result["four"] *= mods.get("boundary_mod", 1.0)
+            result["six"] *= mods.get("boundary_mod", 1.0)
+            result["wicket"] *= mods.get("wicket_mod", 1.0)
         elif ctx.bowler_wickets >= 2:
-            result["four"] *= pressure["bowler_on_roll"]["2_wickets"]["boundary_mod"]
-            result["six"] *= pressure["bowler_on_roll"]["2_wickets"]["boundary_mod"]
+            mods = bowler_roll.get("2_wickets", {})
+            result["four"] *= mods.get("boundary_mod", 1.0)
+            result["six"] *= mods.get("boundary_mod", 1.0)
+            result["wicket"] *= mods.get("wicket_mod", 1.0)
 
-        # Partnership confidence
-        if ctx.partnership_runs >= 50:
-            mods = pressure["partnership"]["50_runs"]
-            result["four"] *= mods["boundary_mod"]
-            result["six"] *= mods["boundary_mod"]
-            result["wicket"] *= mods["wicket_mod"]
+        # Partnership dynamics - DATA-DERIVED
+        # Early partnerships are safest, then risk increases
+        partnership = pressure.get("partnership", {})
+        if ctx.partnership_runs >= 100:
+            mods = partnership.get("100_plus", {})
+        elif ctx.partnership_runs >= 75:
+            mods = partnership.get("75_100", {})
+        elif ctx.partnership_runs >= 50:
+            mods = partnership.get("50_75", {})
         elif ctx.partnership_runs >= 30:
-            mods = pressure["partnership"]["30_runs"]
-            result["four"] *= mods["boundary_mod"]
-            result["six"] *= mods["boundary_mod"]
-            result["wicket"] *= mods["wicket_mod"]
+            mods = partnership.get("30_50", {})
+        elif ctx.partnership_runs >= 20:
+            mods = partnership.get("20_30", {})
+        elif ctx.partnership_runs >= 10:
+            mods = partnership.get("10_20", {})
+        else:
+            mods = partnership.get("0_10", {})
+
+        if mods:
+            result["four"] *= mods.get("boundary_mod", 1.0)
+            result["six"] *= mods.get("boundary_mod", 1.0)
+            result["wicket"] *= mods.get("wicket_mod", 1.0)
+            result["dot"] *= mods.get("dot_mod", 1.0)
+
+        # Apply momentum modifiers
+        result = self._apply_momentum_modifiers(result, ctx)
+
+        return result
+
+    def _apply_momentum_modifiers(
+        self,
+        probs: Dict[str, float],
+        ctx: SimulationContext
+    ) -> Dict[str, float]:
+        """Apply momentum modifiers based on recent scoring patterns."""
+        result = dict(probs)
+        momentum = self.params.get("momentum", {})
+
+        # By recent runs in last 6 balls
+        by_recent_runs = momentum.get("by_recent_runs", {})
+        if ctx.recent_runs >= 15:
+            mods = by_recent_runs.get("15_24", {})
+        elif ctx.recent_runs >= 8:
+            mods = by_recent_runs.get("8_14", {})
+        elif ctx.recent_runs >= 3:
+            mods = by_recent_runs.get("3_7", {})
+        else:
+            mods = by_recent_runs.get("0_2", {})
+
+        if mods:
+            result["four"] *= mods.get("boundary_mod", 1.0)
+            result["six"] *= mods.get("boundary_mod", 1.0)
+            result["wicket"] *= mods.get("wicket_mod", 1.0)
+
+        # By recent boundaries - boundaries breed boundaries
+        by_boundaries = momentum.get("by_recent_boundaries", {})
+        if ctx.recent_boundaries >= 3:
+            mods = by_boundaries.get("3_plus", {})
+        elif ctx.recent_boundaries == 2:
+            mods = by_boundaries.get("2", by_boundaries.get(2, {}))
+        elif ctx.recent_boundaries == 1:
+            mods = by_boundaries.get("1", by_boundaries.get(1, {}))
+        else:
+            mods = by_boundaries.get("0", by_boundaries.get(0, {}))
+
+        if mods:
+            result["four"] *= mods.get("boundary_mod", 1.0)
+            result["six"] *= mods.get("boundary_mod", 1.0)
+            result["wicket"] *= mods.get("wicket_mod", 1.0)
+
+        # By recent dots - dot pressure
+        by_dots = momentum.get("by_recent_dots", {})
+        if ctx.recent_dots >= 5:
+            mods = by_dots.get("5_plus", {})
+        elif ctx.recent_dots == 4:
+            mods = by_dots.get("4", by_dots.get(4, {}))
+        elif ctx.recent_dots == 3:
+            mods = by_dots.get("3", by_dots.get(3, {}))
+        elif ctx.recent_dots == 2:
+            mods = by_dots.get("2", by_dots.get(2, {}))
+        elif ctx.recent_dots == 1:
+            mods = by_dots.get("1", by_dots.get(1, {}))
+        else:
+            mods = by_dots.get("0", by_dots.get(0, {}))
+
+        if mods:
+            result["four"] *= mods.get("boundary_mod", 1.0)
+            result["six"] *= mods.get("boundary_mod", 1.0)
+            result["wicket"] *= mods.get("wicket_mod", 1.0)
 
         return result
 
@@ -273,9 +366,9 @@ class ProbabilityModel:
         probs: Dict[str, float],
         ctx: SimulationContext
     ) -> Dict[str, float]:
-        """Apply pressure from chasing a target."""
+        """Apply pressure from chasing a target - DATA-DERIVED from IPL 2nd innings."""
         result = dict(probs)
-        pressure = self.params["pressure"]["required_rate"]
+        pressure = self.params["pressure"].get("required_rate", {})
 
         balls_remaining = (20 - ctx.overs) * 6
         if balls_remaining <= 0:
@@ -284,16 +377,20 @@ class ProbabilityModel:
         runs_needed = ctx.target - ctx.current_runs
         required_rate = (runs_needed / balls_remaining) * 6
 
+        # Select appropriate modifiers based on required rate
         if required_rate > 12:
-            mods = pressure["over_12"]
-            result["four"] *= mods["boundary_mod"]
-            result["six"] *= mods["boundary_mod"]
-            result["wicket"] *= mods["wicket_mod"]
+            mods = pressure.get("over_12", {})
         elif required_rate > 9:
-            mods = pressure["9_to_12"]
-            result["four"] *= mods["boundary_mod"]
-            result["six"] *= mods["boundary_mod"]
-            result["wicket"] *= mods["wicket_mod"]
+            mods = pressure.get("9_to_12", {})
+        elif required_rate > 6:
+            mods = pressure.get("normal", {})
+        else:
+            mods = pressure.get("low", {})
+
+        if mods:
+            result["four"] *= mods.get("boundary_mod", 1.0)
+            result["six"] *= mods.get("boundary_mod", 1.0)
+            result["wicket"] *= mods.get("wicket_mod", 1.0)
 
         return result
 

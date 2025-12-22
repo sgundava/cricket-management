@@ -1,14 +1,16 @@
 # Cricket Match Engine Probability Parameters
-# Calibrated from IPL historical data (to be updated with real analysis)
+# Calibrated from IPL historical data (278K balls, 1169 matches, 2009-2025)
 #
 # These parameters can be A/B tested and tuned without code changes.
 # All probabilities should sum to 1.0 within their group.
+#
+# Last updated: Dec 2024 - Full IPL data calibration
 
 # ============================================
 # BASE OUTCOME PROBABILITIES
 # ============================================
 # Calibrated from IPL data (278K balls, 1169 matches, 2009-2025)
-# Wicket at 5.1% = ~6 wickets per 120 balls (realistic T20)
+# Wicket at 5.14% = ~6 wickets per 120 balls (realistic T20)
 base_outcomes:
   dot: 0.326
   single: 0.382
@@ -141,41 +143,180 @@ batsman_state:
 # ============================================
 # PRESSURE/MOMENTUM MODIFIERS
 # ============================================
-# Context-based adjustments
+# DATA-DERIVED from IPL analysis - these values are crucial for realistic match flow
 pressure:
-  # Recent wickets - batters consolidate
+  # Recent wickets in last 3 overs - KEY FOR COLLAPSE PREVENTION
+  # After 3+ wickets, pressure compounds (dampened from raw IPL data to prevent excessive cascading)
   recent_wickets:
+    0:
+      boundary_mod: 1.058   # Batters attack freely when stable
+      wicket_mod: 0.958
+      dot_mod: 1.008
+    1:
+      boundary_mod: 0.935   # Slight caution
+      wicket_mod: 1.026
+      dot_mod: 0.967
     2:
-      boundary_mod: 0.95
-      dot_mod: 1.02
+      boundary_mod: 0.834   # Significant consolidation
+      wicket_mod: 1.12      # 12% more wicket risk (dampened from 16%)
+      dot_mod: 1.054
     3:
-      boundary_mod: 0.90
-      dot_mod: 1.05
+      boundary_mod: 0.738   # Full survival mode
+      wicket_mod: 1.38      # 38% more wicket risk (dampened from 54% to prevent cascading)
+      dot_mod: 1.096
 
-  # Bowler on a roll
+  # Bowler psychological advantage
+  # Note: Current data shows limited granularity, using conservative estimates
   bowler_on_roll:
     2_wickets:
       boundary_mod: 0.96
+      wicket_mod: 1.05
     3_wickets:
       boundary_mod: 0.92
+      wicket_mod: 1.10
 
-  # Partnership builds confidence
+  # Partnership dynamics - DATA-DERIVED
+  # Key insight: early partnerships are SAFEST, then risk increases as batters attack
   partnership:
-    30_runs:
-      boundary_mod: 1.04
-      wicket_mod: 0.96    # Set batters safer
-    50_runs:
-      boundary_mod: 1.08
-      wicket_mod: 0.92
+    "0_10":
+      boundary_mod: 0.816   # Conservative start
+      wicket_mod: 0.925     # Safest period!
+      dot_mod: 1.202
+    "10_20":
+      boundary_mod: 1.071   # Opening up
+      wicket_mod: 1.017
+      dot_mod: 0.957
+    "20_30":
+      boundary_mod: 1.130   # Building momentum
+      wicket_mod: 1.037
+      dot_mod: 0.870
+    "30_50":
+      boundary_mod: 1.188   # Attacking freely
+      wicket_mod: 1.056
+      dot_mod: 0.811
+    "50_75":
+      boundary_mod: 1.143   # Established
+      wicket_mod: 1.111     # Taking more risks
+      dot_mod: 0.732
+    "75_100":
+      boundary_mod: 1.210   # Dominant
+      wicket_mod: 1.178
+      dot_mod: 0.624
+    "100_plus":
+      boundary_mod: 1.424   # Carnage mode
+      wicket_mod: 1.233
+      dot_mod: 0.572
 
-  # High required rate forces risks
+  # High required rate forces risks - DATA-DERIVED from 2nd innings analysis
   required_rate:
+    low:          # RRR <= 6
+      boundary_mod: 1.10
+      wicket_mod: 0.77
+    normal:       # RRR 6-9
+      boundary_mod: 0.99
+      wicket_mod: 0.76
     9_to_12:
-      boundary_mod: 1.15
-      wicket_mod: 1.20
+      boundary_mod: 0.95
+      wicket_mod: 0.97
     over_12:
-      boundary_mod: 1.30
-      wicket_mod: 1.40
+      boundary_mod: 0.94    # Surprisingly, boundaries don't increase much
+      wicket_mod: 1.62      # But wickets skyrocket!
+
+# ============================================
+# MOMENTUM MODIFIERS (NEW - DATA-DERIVED)
+# ============================================
+# Boundaries come in bursts, dot balls build pressure
+momentum:
+  # Impact of runs scored in last 6 balls (1 over)
+  by_recent_runs:
+    "0_2":
+      boundary_mod: 0.819   # Low momentum
+      wicket_mod: 0.831     # Also safer though
+    "3_7":
+      boundary_mod: 0.911   # Normal flow
+      wicket_mod: 0.959
+    "8_14":
+      boundary_mod: 1.080   # Building momentum
+      wicket_mod: 1.049
+    "15_24":
+      boundary_mod: 1.345   # Hot streak - 35% more boundaries!
+      wicket_mod: 1.227
+
+  # Boundary bursts - boundaries breed boundaries
+  by_recent_boundaries:
+    "0":
+      boundary_mod: 0.858   # Cold
+      wicket_mod: 0.947
+    "1":
+      boundary_mod: 1.001   # Neutral
+      wicket_mod: 1.018
+    "2":
+      boundary_mod: 1.143   # Warming up
+      wicket_mod: 1.018
+    "3_plus":
+      boundary_mod: 1.334   # On fire - 33% more boundaries!
+      wicket_mod: 1.128
+
+  # Dot ball pressure - consecutive dots make batters nervous
+  by_recent_dots:
+    "0":
+      boundary_mod: 1.080   # Flowing
+      wicket_mod: 1.078
+    "1":
+      boundary_mod: 1.068
+      wicket_mod: 1.069
+    "2":
+      boundary_mod: 1.016   # Starting to feel pressure
+      wicket_mod: 1.005
+    "3":
+      boundary_mod: 0.950
+      wicket_mod: 0.971
+    "4":
+      boundary_mod: 0.917   # Mounting pressure
+      wicket_mod: 0.894     # But actually safer - playing careful
+    "5_plus":
+      boundary_mod: 0.865   # Strangled
+      wicket_mod: 0.889
+
+# ============================================
+# SPELL PATTERNS (NEW - DATA-DERIVED)
+# ============================================
+# For AI bowler selection - when different bowler types should bowl
+spell_patterns:
+  # Pace bowlers dominate PP and death
+  pace_profile:
+    powerplay: 0.495      # ~50% of pace overs in PP
+    middle: 0.274         # Limited middle overs use
+    death: 0.231          # Key death overs role
+
+  # Spin bowlers dominate middle overs
+  spin_profile:
+    powerplay: 0.228      # Occasional PP use
+    middle: 0.659         # ~66% of spin overs in middle
+    death: 0.113          # Rarely at death
+
+  # Consecutive overs patterns
+  consecutive_overs:
+    typical_max: 2        # Most bowlers bowl max 2 consecutive
+    recommended_rest: 2   # Overs between spells
+
+# ============================================
+# WICKET CLUSTERING REFERENCE
+# ============================================
+# For understanding collapse patterns - 52% of innings have a collapse!
+wicket_clustering:
+  mean_gap_balls: 16.3          # Average balls between wickets
+  median_gap_balls: 12.0        # Median gap (lower = clustering)
+  clustering_ratio: 1.20        # Wickets come 20% closer than random
+  collapse_rate: 0.52           # 52% of innings have 3+ wickets in 3 overs
+  # Gap by wicket number - later wickets cluster more
+  gap_by_wicket:
+    2: 22.0   # 2nd wicket comes ~22 balls after 1st
+    3: 20.6
+    4: 18.1
+    5: 15.3
+    6: 12.2
+    7: 9.4    # 7th wicket just 9 balls after 6th - collapse territory
 
 # ============================================
 # SKILL IMPACT

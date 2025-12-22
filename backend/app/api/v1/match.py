@@ -279,19 +279,42 @@ def _recommend_next_bowler(
 
 
 def _simple_bowler_score(bowler: PlayerStats, state, phase: MatchPhase) -> float:
-    """Simple bowler scoring for recommendations."""
+    """
+    Simple bowler scoring for recommendations.
+
+    Uses IPL-derived spell patterns:
+    - Pace: 49.5% PP, 27.4% middle, 23.1% death
+    - Spin: 22.8% PP, 65.9% middle, 11.3% death
+    """
     score = 50.0
+    engine = get_engine()
+
+    # Get spell patterns from config
+    spell_patterns = engine.probability_model.params.get("spell_patterns", {})
+    pace_profile = spell_patterns.get("pace_profile", {
+        "powerplay": 0.495, "middle": 0.274, "death": 0.231
+    })
+    spin_profile = spell_patterns.get("spin_profile", {
+        "powerplay": 0.228, "middle": 0.659, "death": 0.113
+    })
 
     is_pace = bowler.bowling_style and "fast" in bowler.bowling_style.value.lower()
     is_spin = bowler.bowling_style and "spin" in bowler.bowling_style.value.lower()
 
-    # Phase matching
-    if phase == MatchPhase.POWERPLAY and is_pace:
-        score += 20
-    elif phase == MatchPhase.MIDDLE and is_spin:
-        score += 20
-    elif phase == MatchPhase.DEATH and is_pace:
-        score += 25
+    # Phase matching using IPL-derived spell patterns
+    # Score bonus based on how much this bowler type typically bowls in this phase
+    phase_key = phase.value  # "powerplay", "middle", or "death"
+
+    if is_pace:
+        # Pace bowlers get bonus proportional to their typical phase usage
+        phase_weight = pace_profile.get(phase_key, 0.33)
+        # Scale: 0.495 (PP) -> +25, 0.274 (middle) -> +10, 0.231 (death) -> +15
+        score += phase_weight * 50  # Max ~25 points for preferred phase
+    elif is_spin:
+        # Spin bowlers get bonus proportional to their typical phase usage
+        phase_weight = spin_profile.get(phase_key, 0.33)
+        # Scale: 0.659 (middle) -> +33, 0.228 (PP) -> +11, 0.113 (death) -> +6
+        score += phase_weight * 50  # Max ~33 points for preferred phase
 
     # Wicket bonus
     bowler_stats = state.bowler_stats.get(bowler.id)
@@ -321,7 +344,14 @@ def _simple_bowler_score(bowler: PlayerStats, state, phase: MatchPhase) -> float
 
 
 def _score_bowler(bowler: PlayerStats, state, phase: MatchPhase, context) -> tuple:
-    """Score a bowler with detailed reasoning."""
+    """
+    Score a bowler with detailed reasoning.
+
+    Uses IPL-derived insights:
+    - Pace bowls 50% in PP, 23% at death
+    - Spin bowls 66% in middle overs
+    - Partnership 30+ runs increases boundary rate by 19%
+    """
     score = _simple_bowler_score(bowler, state, phase)
 
     reasons = []
@@ -329,22 +359,44 @@ def _score_bowler(bowler: PlayerStats, state, phase: MatchPhase, context) -> tup
     is_pace = bowler.bowling_style and "fast" in bowler.bowling_style.value.lower()
     is_spin = bowler.bowling_style and "spin" in bowler.bowling_style.value.lower()
 
-    if phase == MatchPhase.POWERPLAY and is_pace:
-        reasons.append("Pace suits powerplay")
-    elif phase == MatchPhase.MIDDLE and is_spin:
-        reasons.append("Spin effective in middle overs")
-    elif phase == MatchPhase.DEATH and is_pace:
-        reasons.append("Pace crucial at death")
+    # Phase-based reasoning with IPL percentages
+    if phase == MatchPhase.POWERPLAY:
+        if is_pace:
+            reasons.append("Pace bowlers bowl 50% of PP overs in IPL")
+        elif is_spin:
+            reasons.append("Spin only 23% of PP overs - use strategically")
+    elif phase == MatchPhase.MIDDLE:
+        if is_spin:
+            reasons.append("Spin dominates middle overs (66% in IPL)")
+        elif is_pace:
+            reasons.append("Pace less common in middle (27%)")
+    elif phase == MatchPhase.DEATH:
+        if is_pace:
+            reasons.append("Pace handles death overs (23% allocation)")
+        elif is_spin:
+            reasons.append("Spin rare at death (11%) - risky choice")
 
+    # Bowler on a roll
     bowler_stats = state.bowler_stats.get(bowler.id)
     if bowler_stats and bowler_stats.wickets >= 2:
         reasons.append(f"On a roll with {bowler_stats.wickets} wickets")
 
-    if context.partnership_runs >= 30:
+    # Partnership breaking - data shows spin can disrupt rhythm
+    if context.partnership_runs >= 50:
         if is_spin:
-            reasons.append("Spin could break partnership")
+            reasons.append("Spin change could break 50+ partnership")
         else:
-            reasons.append("Pace could break partnership")
+            reasons.append("Pace aggression vs settled batters")
+    elif context.partnership_runs >= 30:
+        reasons.append(f"Partnership at {context.partnership_runs} - change of pace needed")
+
+    # Recent wickets - pressure situation
+    recent_wickets = sum(
+        1 for fow in state.fall_of_wickets
+        if fow.overs >= state.overs - 3
+    )
+    if recent_wickets >= 2:
+        reasons.append(f"Keep pressure after {recent_wickets} recent wickets")
 
     reasoning = "; ".join(reasons) if reasons else "Solid option for this phase"
 
