@@ -13,6 +13,13 @@ import {
   canTeamAddOverseas,
   isSquadFull,
 } from '../data/auction';
+import {
+  calculateDataDrivenValuation,
+  getTeamProfile,
+  calculateInterestFromDemand,
+  PlayerValuation,
+} from './auctionPricing';
+import { AUCTION_STATS } from '../data/auctionData';
 
 // ============================================
 // AI BID DECISION
@@ -29,11 +36,11 @@ export interface AIBidDecision {
  * Main AI bidding decision function
  * Determines if a team should bid and their maximum amount
  *
- * Key principle: HIGH-VALUE PLAYERS attract MORE TEAMS
- * - Star players (80+): Nearly every team interested
- * - Good players (60-80): Most teams interested
- * - Average players (40-60): Some teams interested
- * - Low value (<40): Few teams interested
+ * Uses data-driven valuation from IPL auction history:
+ * - Role multipliers (all-rounders 1.15x, keepers 0.70x)
+ * - Overseas premium (2.2x)
+ * - Age factors (youth premium 1.3x)
+ * - Team personality profiles
  */
 export function calculateAIBidDecision(
   teamState: TeamAuctionState,
@@ -54,24 +61,29 @@ export function calculateAIBidDecision(
     };
   }
 
-  // Calculate player's base value (0-100 scale)
-  const baseValue = calculatePlayerValue(player);
+  // Get data-driven player valuation
+  const valuation = calculateDataDrivenValuation(player);
 
-  // Calculate base interest probability from player quality
-  // This is the PRIMARY factor - quality players attract more bidders
-  const qualityInterest = calculateQualityInterest(baseValue);
+  // Calculate base interest probability from demand score
+  // This uses IPL historical data patterns
+  const qualityInterest = calculateInterestFromDemand(valuation.demandScore);
 
   // Role need multiplier (1.0 to 1.5) - secondary factor
   const roleNeedMultiplier = calculateRoleNeed(teamState, player, strategy);
 
-  // Overseas consideration
+  // Overseas consideration based on team profile
+  const teamProfile = getTeamProfile(teamState.teamId);
   const overseasPenalty = player.contract.isOverseas
-    ? (teamState.overseasCount >= 6 ? 0.5 : teamState.overseasCount >= 4 ? 0.8 : 1.0)
+    ? (teamState.overseasCount >= 6
+        ? 0.3 + teamProfile.overseasPref * 0.2
+        : teamState.overseasCount >= 4
+          ? 0.6 + teamProfile.overseasPref * 0.3
+          : 1.0)
     : 1.0;
 
-  // Calculate maximum bid based on player VALUE TIER
-  const maxBid = calculateMaxBid(
-    baseValue,
+  // Calculate maximum bid using data-driven valuation
+  const maxBid = calculateMaxBidDataDriven(
+    valuation,
     teamState,
     strategy,
     roleNeedMultiplier,
@@ -95,20 +107,21 @@ export function calculateAIBidDecision(
   if (strategy.targetPlayers.includes(player.id)) {
     return {
       shouldBid: true,
-      maxBid: maxBid * 1.2, // Willing to overpay for targets
+      maxBid: maxBid * teamProfile.marqueeBonus, // Use team's marquee bonus
       urgency: 95,
       reason: 'Target player',
     };
   }
 
-  // Calculate final bid probability
-  // High-value players get HIGH base interest, team needs provide bonus
+  // Calculate final bid probability using team aggression from profile
   const bidProgress = auctionPlayer.currentBid / Math.max(maxBid, 1);
-  const progressPenalty = Math.max(0.3, 1 - bidProgress * 0.7); // Less eager as price rises
+  const progressPenalty = Math.max(0.3, 1 - bidProgress * 0.7);
 
-  const bidWarFatigue = Math.max(0.5, 1 - auctionPlayer.bidHistory.length * 0.05); // Fatigue in long wars
+  // Bidding war fatigue - based on historical patterns
+  const bidWarFatigue = Math.max(0.5, 1 - auctionPlayer.bidHistory.length * 0.05);
 
-  const aggressionBonus = 1 + (strategy.aggression - 50) / 200; // -0.25 to +0.25
+  // Apply team aggression from calibrated profile
+  const aggressionBonus = 1 + (teamProfile.aggression - 50) / 200;
 
   const finalProbability = Math.min(
     0.95,
@@ -116,19 +129,20 @@ export function calculateAIBidDecision(
   );
 
   const shouldBid = Math.random() < finalProbability;
-  const urgency = calculateUrgency(teamState, player, strategy, settings, baseValue);
+  const urgency = calculateUrgency(teamState, player, strategy, settings, valuation.baseValue);
 
   return {
     shouldBid,
     maxBid,
     urgency,
-    reason: shouldBid ? `Value: ${baseValue.toFixed(0)}` : 'Passing',
+    reason: shouldBid ? `Value: ${valuation.baseValue.toFixed(0)}, Market: ${valuation.marketValue}L` : 'Passing',
   };
 }
 
 /**
  * Calculate base interest probability from player quality
  * THIS IS THE KEY FUNCTION - ensures stars attract bidders
+ * @deprecated Use calculateInterestFromDemand from auctionPricing.ts
  */
 function calculateQualityInterest(playerValue: number): number {
   // Star players (80+): 85-95% interest from each team
@@ -153,6 +167,46 @@ function calculateQualityInterest(playerValue: number): number {
   }
   // Low value (<40): 5-15% interest
   return 0.05 + playerValue * 0.0025;
+}
+
+/**
+ * Calculate maximum bid using data-driven valuation
+ * Uses IPL historical data patterns for realistic pricing
+ */
+function calculateMaxBidDataDriven(
+  valuation: PlayerValuation,
+  teamState: TeamAuctionState,
+  strategy: AIBiddingStrategy,
+  roleNeedMultiplier: number,
+  settings: AuctionSettings
+): number {
+  // Start with ceiling from data-driven valuation
+  let tierMaxBid = valuation.priceRange.ceiling;
+
+  // Apply team personality from calibrated profiles
+  const profile = getTeamProfile(teamState.teamId);
+
+  // Aggression factor from team profile (0.85 to 1.15)
+  const aggressionFactor = 0.85 + (profile.aggression / 100) * 0.3;
+
+  // Budget conservation from strategy (0.85 to 1.15)
+  const conservationFactor = 1.15 - (strategy.budgetConservation / 100) * 0.3;
+
+  // Role need bonus (up to 20% more for needed roles)
+  const needBonus = 1 + (roleNeedMultiplier - 1) * 0.2;
+
+  // Marquee bonus for star players
+  const marqueeBonus = valuation.baseValue >= 80 ? profile.marqueeBonus : 1.0;
+
+  // Calculate budget constraint
+  const slotsRemaining = settings.minSquadSize - teamState.squadSize;
+  const maxSpendRatio = getMaxSpendRatio(teamState, settings);
+  const budgetLimit = teamState.remainingPurse * maxSpendRatio;
+
+  // Final max bid: data-driven with modifiers, capped by budget
+  const adjustedMax = tierMaxBid * aggressionFactor * conservationFactor * needBonus * marqueeBonus;
+
+  return Math.min(adjustedMax, budgetLimit);
 }
 
 /**
