@@ -35,6 +35,11 @@ import {
 import { generatePlayoffMatch } from '../data/fixtures';
 import { generateRandomEvent } from '../data/events';
 import {
+  generateAIRetentions,
+  generateAIReleases,
+  getAllAIReleasedPlayerIds,
+} from '../engine/aiSquadManagement';
+import {
   generateAuctionPool,
   createAuctionSettings,
   createTeamAuctionState,
@@ -1076,21 +1081,28 @@ export const useGameStore = create<GameStore>()(
       confirmReleases: () => {
         const { releasedPlayers, teams, players, playerTeamId, unsoldPlayers } = get();
 
+        // Generate AI releases for all AI teams
+        const aiReleases = generateAIReleases(teams, players, playerTeamId);
+        const aiReleasedIds = getAllAIReleasedPlayerIds(aiReleases);
+
+        // Combine player releases with AI releases
+        const allReleasedPlayers = [...new Set([...releasedPlayers, ...aiReleasedIds])];
+
         // Remove released players from their teams
         const updatedTeams = teams.map((team) => ({
           ...team,
-          squad: team.squad.filter((id) => !releasedPlayers.includes(id)),
+          squad: team.squad.filter((id) => !allReleasedPlayers.includes(id)),
         }));
 
         // Update player contracts for released players
         const updatedPlayers = players.map((player) =>
-          releasedPlayers.includes(player.id)
+          allReleasedPlayers.includes(player.id)
             ? { ...player, contract: { ...player.contract, yearsRemaining: 0 } }
             : player
         );
 
         // Combine released players with previously unsold players for mini auction pool
-        const auctionPool = [...new Set([...releasedPlayers, ...unsoldPlayers])];
+        const auctionPool = [...new Set([...allReleasedPlayers, ...unsoldPlayers])];
 
         set({
           teams: updatedTeams,
@@ -1604,9 +1616,22 @@ export const useGameStore = create<GameStore>()(
         const { auctionState, playerTeamId, players, teams } = get();
         if (!auctionState || auctionState.status !== 'retention_phase') return;
 
+        // Generate AI retentions for all AI teams
+        const aiRetentions = generateAIRetentions(teams, players, playerTeamId);
+
+        // Apply AI retentions to team states
+        const updatedTeamStates = { ...auctionState.teamStates };
+        Object.entries(aiRetentions).forEach(([teamId, retentions]) => {
+          if (updatedTeamStates[teamId]) {
+            updatedTeamStates[teamId] = {
+              ...updatedTeamStates[teamId],
+              retentions,
+            };
+          }
+        });
+
         // Collect all retained player IDs across all teams
         const retainedPlayerIds: string[] = [];
-        const updatedTeamStates = { ...auctionState.teamStates };
 
         Object.entries(updatedTeamStates).forEach(([teamId, teamState]) => {
           const retainedIds = teamState.retentions
