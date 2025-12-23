@@ -73,6 +73,9 @@ export const AuctionScreen = () => {
   // Ref to cancel AI bidding loop when player interrupts
   const cancelAIBiddingRef = useRef(false);
 
+  // Ref to prevent auto-start effect from calling nextPlayer twice
+  const hasAutoStartedRef = useRef(false);
+
   const { getSaveSlots, saveToSlot, resetGame } = useGameStore();
   const saveSlots = getSaveSlots();
 
@@ -95,12 +98,22 @@ export const AuctionScreen = () => {
       auctionState &&
       auctionState.status === 'bidding' &&
       !auctionState.currentPlayer &&
+      !hasAutoStartedRef.current &&
       auctionState.auctionPool.some((p) => p.status === 'available')
     ) {
+      // Mark as started to prevent double-calling due to React StrictMode or re-renders
+      hasAutoStartedRef.current = true;
       // Call nextPlayer to get the first player
       nextPlayer();
     }
   }, [auctionState, nextPlayer]);
+
+  // Reset auto-start ref when auction status changes away from bidding
+  useEffect(() => {
+    if (auctionState?.status !== 'bidding') {
+      hasAutoStartedRef.current = false;
+    }
+  }, [auctionState?.status]);
 
   // Get current player details
   const currentAuctionPlayer = auctionState?.currentPlayer;
