@@ -248,10 +248,9 @@ function isPaceBowler(player: Player): boolean {
 function isSpinner(player: Player): boolean {
   return (
     player.role === 'bowler' &&
-    (player.bowlingStyle === 'right-arm-offspin' ||
-      player.bowlingStyle === 'left-arm-orthodox' ||
-      player.bowlingStyle === 'right-arm-legspin' ||
-      player.bowlingStyle === 'left-arm-wrist-spin')
+    (player.bowlingStyle === 'off-spin' ||
+      player.bowlingStyle === 'left-arm-spin' ||
+      player.bowlingStyle === 'leg-spin')
   );
 }
 
@@ -474,7 +473,7 @@ export function generateAIRetentions(
     result[team.id] = retentions;
 
     // Debug logging
-    if (process.env.NODE_ENV === 'development') {
+    if (import.meta.env.DEV) {
       console.log(
         `[AI Retention] ${team.shortName}: Retaining ${retentionCount} players (${profile.retentionStyle})`
       );
@@ -555,7 +554,7 @@ export function generateAIReleases(
     result[team.id] = releasedIds;
 
     // Debug logging
-    if (process.env.NODE_ENV === 'development') {
+    if (import.meta.env.DEV) {
       console.log(
         `[AI Release] ${team.shortName}: Releasing ${releasedIds.length} players (${profile.retentionStyle})`
       );
