@@ -6,8 +6,8 @@
  */
 
 export const AUCTION_CONFIG = {
-  // Purse size in lakhs (120 Cr = 12000 lakhs for IPL 2025)
-  TOTAL_PURSE: 12000,
+  // Purse size in lakhs (140 Cr = 14000 lakhs for IPL 2026)
+  TOTAL_PURSE: 14000,
 
   // Squad size limits
   MIN_SQUAD_SIZE: 18,

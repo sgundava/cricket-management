@@ -37,3 +37,7 @@ npm-debug.log*
 
 # GitHub workflows (managed separately)
 .github/
+/backend/app/data/kaggle/auction_24.csv
+/backend/app/data/kaggle/IPL_Sold_players_2013_23.csv
+/backend/app/data/kaggle/ipl_squad_2026.txt
+/backend/app/data/kaggle/ipl2025_auction.json
