@@ -401,7 +401,7 @@ export interface GameEvent {
 // ============================================
 
 export type GamePhase = 'pre-season' | 'auction' | 'season' | 'playoffs' | 'off-season';
-export type GameStartMode = 'real-squads' | 'auction';
+export type GameStartMode = 'real-squads' | 'mini-auction' | 'mega-auction';
 
 export interface PointsTableEntry {
   teamId: string;
@@ -480,6 +480,7 @@ export type AuctionStatus =
   | 'retention_phase'
   | 'bidding'
   | 'paused'
+  | 'squad_fill'
   | 'completed';
 
 export type AuctionPlayerStatus =

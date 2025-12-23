@@ -46,6 +46,10 @@ import {
   hasMinSquad,
   getTotalRetentionCost,
   formatAmount,
+  getSquadFillPool,
+  canPickSquadFillPlayer,
+  autoFillTeamSquad,
+  calculateBasePrice,
 } from '../data/auction';
 import {
   getTeamsWillingToBid,
@@ -148,6 +152,11 @@ interface GameStore extends GameState, UIState {
   getNextBidAmountForPlayer: () => number;
   shouldTriggerAuction: () => { trigger: boolean; type: AuctionType };
 
+  // Squad Fill (post-auction)
+  pickSquadFillPlayer: (playerId: string) => void;
+  autoFillPlayerSquad: () => void;
+  completeSquadFill: () => void;
+
   // Save/Load
   getSaveSlots: () => SaveSlot[];
   saveToSlot: (slotId: 1 | 2 | 3, name?: string) => boolean;
@@ -249,9 +258,9 @@ export const useGameStore = create<GameStore>()(
       // Initialization
       // ----------------------------------------
       initializeGame: (playerTeamId: string, managerName: string, startMode: GameStartMode) => {
-        // If starting with auction, go to auction phase first
+        // If starting with auction (mini or mega), go to auction phase first
         // Otherwise, go directly to season
-        const initialPhase = startMode === 'auction' ? 'auction' : 'season';
+        const initialPhase = startMode === 'real-squads' ? 'season' : 'auction';
 
         set({
           initialized: true,
@@ -1932,11 +1941,11 @@ export const useGameStore = create<GameStore>()(
       },
 
       completeAuction: () => {
-        const { auctionState, teams, players, resetForNewSeason } = get();
+        const { auctionState, teams, players, playerTeamId } = get();
         if (!auctionState) return;
 
         // Update team squads based on auction results
-        const updatedTeams = teams.map((team) => {
+        let updatedTeams = teams.map((team) => {
           const teamState = auctionState.teamStates[team.id];
 
           // Get retained player IDs
@@ -1959,7 +1968,7 @@ export const useGameStore = create<GameStore>()(
         });
 
         // Update players with new contract details for sold players
-        const updatedPlayers = players.map((player) => {
+        let updatedPlayers = players.map((player) => {
           const soldEntry = auctionState.soldPlayers.find((p) => p.playerId === player.id);
           if (soldEntry) {
             return {
@@ -1977,17 +1986,255 @@ export const useGameStore = create<GameStore>()(
         // Track unsold players for future auctions
         const unsoldPlayerIds = auctionState.unsoldPlayers.map((p) => p.playerId);
 
+        // Check which teams need squad fill (< 18 players)
+        const teamsNeedingFill = updatedTeams.filter(
+          (t) => t.squad.length < auctionState.settings.minSquadSize
+        );
+
+        // Auto-fill AI teams that need players
+        const aiTeamsNeedingFill = teamsNeedingFill.filter((t) => t.id !== playerTeamId);
+        const updatedTeamStates = { ...auctionState.teamStates };
+
+        for (const aiTeam of aiTeamsNeedingFill) {
+          const pool = getSquadFillPool(updatedPlayers, updatedTeams, unsoldPlayerIds);
+          const teamState = updatedTeamStates[aiTeam.id];
+          const pickedIds = autoFillTeamSquad(teamState, pool, auctionState.settings);
+
+          if (pickedIds.length > 0) {
+            // Add picked players to team squad
+            const teamIndex = updatedTeams.findIndex((t) => t.id === aiTeam.id);
+            updatedTeams[teamIndex] = {
+              ...updatedTeams[teamIndex],
+              squad: [...updatedTeams[teamIndex].squad, ...pickedIds],
+            };
+
+            // Update players with contracts
+            updatedPlayers = updatedPlayers.map((p) => {
+              if (pickedIds.includes(p.id)) {
+                const basePrice = calculateBasePrice(p);
+                return {
+                  ...p,
+                  contract: {
+                    ...p.contract,
+                    salary: basePrice,
+                    yearsRemaining: 3,
+                  },
+                };
+              }
+              return p;
+            });
+
+            // Update team state
+            const totalCost = pickedIds.reduce((sum, id) => {
+              const player = updatedPlayers.find((p) => p.id === id);
+              return sum + (player ? calculateBasePrice(player) : 0);
+            }, 0);
+
+            updatedTeamStates[aiTeam.id] = {
+              ...teamState,
+              squadSize: teamState.squadSize + pickedIds.length,
+              remainingPurse: teamState.remainingPurse - totalCost,
+              overseasCount:
+                teamState.overseasCount +
+                pickedIds.filter((id) => updatedPlayers.find((p) => p.id === id)?.contract.isOverseas).length,
+            };
+          }
+        }
+
+        // Check if player's team needs squad fill
+        const playerTeam = updatedTeams.find((t) => t.id === playerTeamId);
+        const playerTeamNeedsFill =
+          playerTeam && playerTeam.squad.length < auctionState.settings.minSquadSize;
+
+        if (playerTeamNeedsFill) {
+          // Enter squad fill phase for player
+          set({
+            teams: updatedTeams,
+            players: updatedPlayers,
+            auctionState: {
+              ...auctionState,
+              status: 'squad_fill',
+              teamStates: updatedTeamStates,
+            },
+            unsoldPlayers: unsoldPlayerIds,
+          });
+        } else {
+          // All teams have minimum squad, complete auction
+          set({
+            teams: updatedTeams,
+            players: updatedPlayers,
+            auctionState: {
+              ...auctionState,
+              status: 'completed',
+              teamStates: updatedTeamStates,
+            },
+            unsoldPlayers: unsoldPlayerIds,
+          });
+
+          // Reset for new season (generates new fixtures, etc.)
+          get().resetForNewSeason();
+        }
+      },
+
+      pickSquadFillPlayer: (playerId: string) => {
+        const { auctionState, teams, players, playerTeamId, unsoldPlayers } = get();
+        if (!auctionState || auctionState.status !== 'squad_fill') return;
+
+        const player = players.find((p) => p.id === playerId);
+        if (!player) return;
+
+        const teamState = auctionState.teamStates[playerTeamId];
+        const basePrice = calculateBasePrice(player);
+
+        // Validate pick (may return isFreePickup for emergency fills)
+        const { canPick, isFreePickup } = canPickSquadFillPlayer(teamState, player, basePrice, auctionState.settings);
+        if (!canPick) return;
+
+        const actualCost = isFreePickup ? 0 : basePrice;
+
+        // Add player to team squad
+        const updatedTeams = teams.map((t) =>
+          t.id === playerTeamId ? { ...t, squad: [...t.squad, playerId] } : t
+        );
+
+        // Update player contract (free pickup = 0 salary)
+        const updatedPlayers = players.map((p) =>
+          p.id === playerId
+            ? {
+                ...p,
+                contract: {
+                  ...p.contract,
+                  salary: actualCost,
+                  yearsRemaining: 3,
+                },
+              }
+            : p
+        );
+
+        // Update team state
+        const updatedTeamState = {
+          ...teamState,
+          squadSize: teamState.squadSize + 1,
+          remainingPurse: teamState.remainingPurse - actualCost,
+          overseasCount: teamState.overseasCount + (player.contract.isOverseas ? 1 : 0),
+          batsmen: teamState.batsmen + (player.role === 'batsman' ? 1 : 0),
+          bowlers: teamState.bowlers + (player.role === 'bowler' ? 1 : 0),
+          allrounders: teamState.allrounders + (player.role === 'allrounder' ? 1 : 0),
+          keepers: teamState.keepers + (player.role === 'keeper' ? 1 : 0),
+        };
+
         set({
           teams: updatedTeams,
           players: updatedPlayers,
           auctionState: {
             ...auctionState,
-            status: 'completed',
+            teamStates: {
+              ...auctionState.teamStates,
+              [playerTeamId]: updatedTeamState,
+            },
           },
-          unsoldPlayers: unsoldPlayerIds,
+        });
+      },
+
+      autoFillPlayerSquad: () => {
+        const { auctionState, teams, players, playerTeamId, unsoldPlayers } = get();
+        if (!auctionState || auctionState.status !== 'squad_fill') return;
+
+        const teamState = auctionState.teamStates[playerTeamId];
+        const pool = getSquadFillPool(players, teams, unsoldPlayers);
+        const pickedIds = autoFillTeamSquad(teamState, pool, auctionState.settings);
+
+        if (pickedIds.length === 0) return;
+
+        // Add all picked players
+        const updatedTeams = teams.map((t) =>
+          t.id === playerTeamId ? { ...t, squad: [...t.squad, ...pickedIds] } : t
+        );
+
+        // Calculate costs - track purse to determine free pickups
+        let trackPurse = teamState.remainingPurse;
+        const playerCosts: Record<string, number> = {};
+        for (const id of pickedIds) {
+          const player = players.find((p) => p.id === id);
+          if (player) {
+            const basePrice = calculateBasePrice(player);
+            // Emergency free pickup if purse too low
+            const cost = trackPurse < AUCTION_CONFIG.MIN_RESERVE_PER_SLOT ? 0 : basePrice;
+            playerCosts[id] = cost;
+            trackPurse -= cost;
+          }
+        }
+
+        // Update player contracts with correct costs
+        const updatedPlayers = players.map((p) => {
+          if (pickedIds.includes(p.id)) {
+            return {
+              ...p,
+              contract: {
+                ...p.contract,
+                salary: playerCosts[p.id] ?? 0,
+                yearsRemaining: 3,
+              },
+            };
+          }
+          return p;
         });
 
-        // Reset for new season (generates new fixtures, etc.)
+        // Calculate updated team state
+        let newSquadSize = teamState.squadSize;
+        let newPurse = teamState.remainingPurse;
+        let newOverseas = teamState.overseasCount;
+        let newBatsmen = teamState.batsmen;
+        let newBowlers = teamState.bowlers;
+        let newAllrounders = teamState.allrounders;
+        let newKeepers = teamState.keepers;
+
+        for (const id of pickedIds) {
+          const player = players.find((p) => p.id === id);
+          if (player) {
+            newSquadSize++;
+            newPurse -= playerCosts[id] ?? 0;
+            if (player.contract.isOverseas) newOverseas++;
+            if (player.role === 'batsman') newBatsmen++;
+            if (player.role === 'bowler') newBowlers++;
+            if (player.role === 'allrounder') newAllrounders++;
+            if (player.role === 'keeper') newKeepers++;
+          }
+        }
+
+        set({
+          teams: updatedTeams,
+          players: updatedPlayers,
+          auctionState: {
+            ...auctionState,
+            teamStates: {
+              ...auctionState.teamStates,
+              [playerTeamId]: {
+                ...teamState,
+                squadSize: newSquadSize,
+                remainingPurse: newPurse,
+                overseasCount: newOverseas,
+                batsmen: newBatsmen,
+                bowlers: newBowlers,
+                allrounders: newAllrounders,
+                keepers: newKeepers,
+              },
+            },
+          },
+        });
+      },
+
+      completeSquadFill: () => {
+        const { auctionState, resetForNewSeason } = get();
+        if (!auctionState || auctionState.status !== 'squad_fill') return;
+
+        set({
+          auctionState: {
+            ...auctionState,
+            status: 'completed',
+          },
+        });
+
         resetForNewSeason();
       },
 
@@ -2029,9 +2276,14 @@ export const useGameStore = create<GameStore>()(
       shouldTriggerAuction: (): { trigger: boolean; type: AuctionType } => {
         const { season, phase, startMode } = get();
 
-        // First season with auction mode
-        if (season === 1 && startMode === 'auction' && phase === 'auction') {
-          return { trigger: true, type: 'mega' };
+        // First season with auction mode (mini or mega)
+        if (season === 1 && phase === 'auction') {
+          if (startMode === 'mini-auction') {
+            return { trigger: true, type: 'mini' };
+          }
+          if (startMode === 'mega-auction') {
+            return { trigger: true, type: 'mega' };
+          }
         }
 
         // Between seasons

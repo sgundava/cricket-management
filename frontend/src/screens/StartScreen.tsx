@@ -37,7 +37,7 @@ export const StartScreen = () => {
     initializeGame(selectedTeam, managerName, startMode);
 
     // Navigate based on mode
-    if (startMode === 'auction') {
+    if (startMode === 'mini-auction' || startMode === 'mega-auction') {
       navigateTo('auction');
     } else {
       navigateTo('home');
@@ -190,15 +190,31 @@ export const StartScreen = () => {
               </button>
 
               <button
-                onClick={() => handleSelectMode('auction')}
+                onClick={() => handleSelectMode('mini-auction')}
+                className="w-full bg-gray-700 hover:bg-gray-600 border border-gray-600 rounded-xl p-4 text-left transition-colors"
+              >
+                <div className="flex items-start gap-3">
+                  <span className="text-2xl">🔄</span>
+                  <div>
+                    <h3 className="font-semibold">Mini Auction</h3>
+                    <p className="text-sm text-gray-400 mt-1">
+                      Teams keep their squads. Release players and bid on free agents.
+                    </p>
+                    <div className="mt-2 text-xs text-blue-400">Tune your squad before Season 1</div>
+                  </div>
+                </div>
+              </button>
+
+              <button
+                onClick={() => handleSelectMode('mega-auction')}
                 className="w-full bg-gray-700 hover:bg-gray-600 border border-gray-600 rounded-xl p-4 text-left transition-colors"
               >
                 <div className="flex items-start gap-3">
                   <span className="text-2xl">🏏</span>
                   <div>
-                    <h3 className="font-semibold">Start with Auction</h3>
+                    <h3 className="font-semibold">Mega Auction</h3>
                     <p className="text-sm text-gray-400 mt-1">
-                      Build your squad from scratch. All players go into the auction pool.
+                      All squads reset. Retain up to 4 players, then rebuild from scratch.
                     </p>
                     <div className="mt-2 text-xs text-yellow-400">Full control from day one</div>
                   </div>
@@ -221,7 +237,9 @@ export const StartScreen = () => {
             <p className="text-sm text-gray-400">
               {startMode === 'real-squads'
                 ? 'Pick a team to manage with their current roster'
-                : 'Pick a franchise to represent in the auction'}
+                : startMode === 'mini-auction'
+                  ? 'Pick a team to tune in the mini auction'
+                  : 'Pick a franchise to build in the mega auction'}
             </p>
 
             <div className="grid grid-cols-3 gap-2">
@@ -277,7 +295,11 @@ export const StartScreen = () => {
                   <div>
                     <span className="text-gray-400">Mode: </span>
                     <span className="text-blue-400">
-                      {startMode === 'real-squads' ? 'Real Squads' : 'Auction'}
+                      {startMode === 'real-squads'
+                        ? 'Real Squads'
+                        : startMode === 'mini-auction'
+                          ? 'Mini Auction'
+                          : 'Mega Auction'}
                     </span>
                   </div>
                 </div>
@@ -303,7 +325,11 @@ export const StartScreen = () => {
               disabled={!managerName.trim()}
               className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white py-4 rounded-lg font-semibold text-lg transition-colors"
             >
-              {startMode === 'auction' ? 'Enter Auction' : 'Start Career'}
+              {startMode === 'real-squads'
+                ? 'Start Career'
+                : startMode === 'mini-auction'
+                  ? 'Enter Mini Auction'
+                  : 'Enter Mega Auction'}
             </button>
           </div>
         )}
