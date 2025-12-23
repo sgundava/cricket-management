@@ -1,6 +1,12 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useGameStore } from '../store/gameStore';
-import { formatAmount, formatAmountCompact, hasMinSquad } from '../data/auction';
+import {
+  formatAmount,
+  formatAmountCompact,
+  hasMinSquad,
+  getSquadFillPool,
+  canPickSquadFillPlayer,
+} from '../data/auction';
 import { formatSaveDate } from '../utils/saveManager';
 import { AUCTION_CONFIG } from '../config/gameConfig';
 
@@ -26,6 +32,8 @@ export const AuctionScreen = () => {
     teams,
     players,
     auctionState,
+    unsoldPlayers,
+    startMode,
     navigateTo,
     initializeAuction,
     setRetention,
@@ -43,11 +51,16 @@ export const AuctionScreen = () => {
     completeAuction,
     canPlayerBid,
     getNextBidAmountForPlayer,
+    pickSquadFillPlayer,
+    autoFillPlayerSquad,
+    completeSquadFill,
   } = useGameStore();
 
   const [showRetentionModal, setShowRetentionModal] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<1 | 2 | 3 | 4 | null>(null);
   const [bidPhase, setBidPhase] = useState<BidPhase>('waiting_for_player');
+  const [squadFillSearch, setSquadFillSearch] = useState('');
+  const [squadFillRoleFilter, setSquadFillRoleFilter] = useState<string>('all');
   const [lastBidder, setLastBidder] = useState<string | null>(null);
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [saveSlotSelection, setSaveSlotSelection] = useState<1 | 2 | 3 | null>(null);
@@ -69,9 +82,11 @@ export const AuctionScreen = () => {
   // Initialize auction if not already done
   useEffect(() => {
     if (!auctionState) {
-      initializeAuction('mega');
+      // Determine auction type based on start mode
+      const auctionType = startMode === 'mini-auction' ? 'mini' : 'mega';
+      initializeAuction(auctionType);
     }
-  }, [auctionState, initializeAuction]);
+  }, [auctionState, initializeAuction, startMode]);
 
   // Auto-start bidding for mini auctions or when in bidding status with no current player
   useEffect(() => {
@@ -476,6 +491,196 @@ export const AuctionScreen = () => {
             </div>
           </div>
         )}
+      </div>
+    );
+  }
+
+  // Squad Fill Phase UI
+  if (auctionState.status === 'squad_fill') {
+    const playersNeeded = auctionState.settings.minSquadSize - teamState.squadSize;
+    const squadFillPool = getSquadFillPool(players, teams, unsoldPlayers);
+
+    // Filter pool based on search and role
+    const filteredPool = squadFillPool.filter(({ player }) => {
+      const matchesSearch =
+        squadFillSearch === '' ||
+        player.name.toLowerCase().includes(squadFillSearch.toLowerCase()) ||
+        player.shortName.toLowerCase().includes(squadFillSearch.toLowerCase());
+      const matchesRole = squadFillRoleFilter === 'all' || player.role === squadFillRoleFilter;
+      return matchesSearch && matchesRole;
+    });
+
+    const canComplete = teamState.squadSize >= auctionState.settings.minSquadSize;
+
+    return (
+      <div className="min-h-screen bg-gray-900 text-white pb-24">
+        <header className="bg-gray-800 p-4 border-b border-gray-700">
+          <h1 className="text-xl font-bold text-center">
+            Squad Fill {playersNeeded > 0 ? `- Need ${playersNeeded} more` : '- Complete!'}
+          </h1>
+          <div className="flex justify-center gap-6 mt-2 text-sm">
+            <span>
+              Budget: <span className="text-green-400 font-medium">{formatAmount(teamState.remainingPurse)}</span>
+            </span>
+            <span>
+              Squad: <span className="font-medium">{teamState.squadSize}/{auctionState.settings.minSquadSize}</span>
+            </span>
+            <span>
+              Overseas: <span className="text-blue-400 font-medium">{teamState.overseasCount}/8</span>
+            </span>
+          </div>
+        </header>
+
+        <div className="max-w-lg mx-auto p-4 space-y-4">
+          {/* Search and Filter */}
+          <div className="flex gap-2">
+            <input
+              type="text"
+              placeholder="Search players..."
+              value={squadFillSearch}
+              onChange={(e) => setSquadFillSearch(e.target.value)}
+              className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
+            />
+            <select
+              value={squadFillRoleFilter}
+              onChange={(e) => setSquadFillRoleFilter(e.target.value)}
+              className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
+            >
+              <option value="all">All Roles</option>
+              <option value="batsman">Batsman</option>
+              <option value="bowler">Bowler</option>
+              <option value="allrounder">All-rounder</option>
+              <option value="keeper">Keeper</option>
+            </select>
+          </div>
+
+          {/* Unsold Players Section */}
+          {filteredPool.filter((p) => p.isUnsold).length > 0 && (
+            <div className="bg-gray-800 rounded-xl p-4 border border-yellow-600/30">
+              <h3 className="font-semibold mb-3 text-yellow-400">Unsold From Auction</h3>
+              <div className="space-y-2 max-h-48 overflow-y-auto">
+                {filteredPool
+                  .filter((p) => p.isUnsold)
+                  .map(({ player, basePrice }) => {
+                    const { canPick, reason } = canPickSquadFillPlayer(
+                      teamState,
+                      player,
+                      basePrice,
+                      auctionState.settings
+                    );
+                    return (
+                      <div
+                        key={player.id}
+                        className="flex items-center justify-between py-2 border-b border-gray-700 last:border-0"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className={`px-2 py-1 text-xs rounded ${roleColors[player.role]}`}>
+                            {roleBadges[player.role]}
+                          </span>
+                          <span>{player.shortName}</span>
+                          {player.contract.isOverseas && (
+                            <span className="text-xs text-blue-400">OS</span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-gray-400 text-sm">{formatAmount(basePrice)}</span>
+                          <button
+                            onClick={() => pickSquadFillPlayer(player.id)}
+                            disabled={!canPick}
+                            className={`px-3 py-1 text-sm rounded ${
+                              canPick
+                                ? 'bg-green-600 hover:bg-green-700'
+                                : 'bg-gray-600 cursor-not-allowed opacity-50'
+                            }`}
+                            title={reason}
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
+          )}
+
+          {/* Free Agents Section */}
+          <div className="bg-gray-800 rounded-xl p-4 border border-gray-700">
+            <h3 className="font-semibold mb-3">Free Agents ({filteredPool.filter((p) => !p.isUnsold).length})</h3>
+            <div className="space-y-2 max-h-64 overflow-y-auto">
+              {filteredPool
+                .filter((p) => !p.isUnsold)
+                .slice(0, 50) // Show first 50 to prevent performance issues
+                .map(({ player, basePrice }) => {
+                  const { canPick, reason } = canPickSquadFillPlayer(
+                    teamState,
+                    player,
+                    basePrice,
+                    auctionState.settings
+                  );
+                  return (
+                    <div
+                      key={player.id}
+                      className="flex items-center justify-between py-2 border-b border-gray-700 last:border-0"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className={`px-2 py-1 text-xs rounded ${roleColors[player.role]}`}>
+                          {roleBadges[player.role]}
+                        </span>
+                        <span>{player.shortName}</span>
+                        {player.contract.isOverseas && (
+                          <span className="text-xs text-blue-400">OS</span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-gray-400 text-sm">{formatAmount(basePrice)}</span>
+                        <button
+                          onClick={() => pickSquadFillPlayer(player.id)}
+                          disabled={!canPick}
+                          className={`px-3 py-1 text-sm rounded ${
+                            canPick
+                              ? 'bg-green-600 hover:bg-green-700'
+                              : 'bg-gray-600 cursor-not-allowed opacity-50'
+                          }`}
+                          title={reason}
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              {filteredPool.filter((p) => !p.isUnsold).length > 50 && (
+                <div className="text-center text-gray-400 text-sm py-2">
+                  ...and {filteredPool.filter((p) => !p.isUnsold).length - 50} more (use search to find specific players)
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex gap-3">
+            {!canComplete && (
+              <button
+                onClick={autoFillPlayerSquad}
+                className="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-3 rounded-lg font-medium"
+              >
+                Auto-Fill Cheapest
+              </button>
+            )}
+            <button
+              onClick={completeSquadFill}
+              disabled={!canComplete}
+              className={`flex-1 py-3 rounded-lg font-medium ${
+                canComplete
+                  ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                  : 'bg-gray-700 text-gray-400 cursor-not-allowed'
+              }`}
+            >
+              {canComplete ? 'Start Season' : `Need ${playersNeeded} more players`}
+            </button>
+          </div>
+        </div>
       </div>
     );
   }

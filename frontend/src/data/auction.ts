@@ -268,9 +268,15 @@ export function createTeamAuctionState(
   const roleCount = (role: string) =>
     auctionType === 'mega' ? 0 : squadPlayers.filter((p) => p.role === role).length;
 
+  // For mini auction, calculate existing squad salary cost
+  const existingSquadCost =
+    auctionType === 'mini'
+      ? squadPlayers.reduce((sum, p) => sum + p.contract.salary, 0)
+      : 0;
+
   return {
     teamId: team.id,
-    remainingPurse: AUCTION_CONFIG.TOTAL_PURSE - retentionCost,
+    remainingPurse: AUCTION_CONFIG.TOTAL_PURSE - retentionCost - existingSquadCost,
     squadSize: auctionType === 'mega' ? 0 : squadPlayers.length,
     overseasCount,
     retentions: [
@@ -424,6 +430,130 @@ export function hasMinSquad(
   settings: AuctionSettings
 ): boolean {
   return teamState.squadSize >= settings.minSquadSize;
+}
+
+// ============================================
+// SQUAD FILL HELPERS
+// ============================================
+
+export interface SquadFillPlayer {
+  player: Player;
+  isUnsold: boolean;
+  basePrice: number;
+}
+
+/**
+ * Get available players for squad fill phase
+ * Returns unsold auction players + free agents (not on any roster)
+ */
+export function getSquadFillPool(
+  players: Player[],
+  teams: Team[],
+  unsoldPlayerIds: string[]
+): SquadFillPlayer[] {
+  // Get all players currently on team rosters
+  const rosterPlayerIds = teams.flatMap((t) => t.squad);
+
+  return players
+    .filter((p) => !rosterPlayerIds.includes(p.id))
+    .map((p) => ({
+      player: p,
+      isUnsold: unsoldPlayerIds.includes(p.id),
+      basePrice: calculateBasePrice(p),
+    }))
+    .sort((a, b) => {
+      // Unsold players first, then by base price (cheapest first)
+      if (a.isUnsold !== b.isUnsold) return a.isUnsold ? -1 : 1;
+      return a.basePrice - b.basePrice;
+    });
+}
+
+/**
+ * Check if a team can pick a player during squad fill
+ */
+export function canPickSquadFillPlayer(
+  teamState: TeamAuctionState,
+  player: Player,
+  basePrice: number,
+  settings: AuctionSettings
+): { canPick: boolean; reason?: string; isFreePickup?: boolean } {
+  // Check squad full
+  if (teamState.squadSize >= settings.maxSquadSize) {
+    return { canPick: false, reason: 'Squad is full (25 players)' };
+  }
+
+  // Check overseas limit
+  if (player.contract.isOverseas && teamState.overseasCount >= AUCTION_CONFIG.MAX_OVERSEAS) {
+    return { canPick: false, reason: 'Overseas limit reached (8 players)' };
+  }
+
+  // Emergency free pickup: if purse too low and still need minimum squad
+  const needsEmergencyFill = teamState.remainingPurse < AUCTION_CONFIG.MIN_RESERVE_PER_SLOT
+    && teamState.squadSize < settings.minSquadSize;
+  if (needsEmergencyFill) {
+    return { canPick: true, isFreePickup: true };
+  }
+
+  // Check purse (must afford player + reserve for remaining minimum slots)
+  const slotsNeeded = Math.max(0, settings.minSquadSize - teamState.squadSize - 1);
+  const minReserve = slotsNeeded * AUCTION_CONFIG.MIN_RESERVE_PER_SLOT;
+
+  if (teamState.remainingPurse < basePrice + minReserve) {
+    return { canPick: false, reason: 'Insufficient budget' };
+  }
+
+  return { canPick: true };
+}
+
+/**
+ * Auto-fill a team with cheapest available players to reach minimum squad
+ * Returns the player IDs that should be added
+ */
+export function autoFillTeamSquad(
+  teamState: TeamAuctionState,
+  pool: SquadFillPlayer[],
+  settings: AuctionSettings
+): string[] {
+  const pickedIds: string[] = [];
+  let currentSquadSize = teamState.squadSize;
+  let currentPurse = teamState.remainingPurse;
+  let currentOverseas = teamState.overseasCount;
+
+  // Sort pool by price (cheapest first)
+  const sortedPool = [...pool].sort((a, b) => a.basePrice - b.basePrice);
+
+  for (const { player, basePrice } of sortedPool) {
+    // Stop if we've reached minimum
+    if (currentSquadSize >= settings.minSquadSize) break;
+
+    // Check overseas limit
+    if (player.contract.isOverseas && currentOverseas >= AUCTION_CONFIG.MAX_OVERSEAS) {
+      continue;
+    }
+
+    // Emergency free pickup: if purse too low, pick for free until minimum reached
+    const needsEmergencyFill = currentPurse < AUCTION_CONFIG.MIN_RESERVE_PER_SLOT;
+    if (needsEmergencyFill) {
+      pickedIds.push(player.id);
+      currentSquadSize++;
+      // No deduction for emergency pickups
+      if (player.contract.isOverseas) currentOverseas++;
+      continue;
+    }
+
+    // Check if we can afford (with reserve for remaining slots)
+    const slotsNeeded = Math.max(0, settings.minSquadSize - currentSquadSize - 1);
+    const minReserve = slotsNeeded * AUCTION_CONFIG.MIN_RESERVE_PER_SLOT;
+
+    if (currentPurse >= basePrice + minReserve) {
+      pickedIds.push(player.id);
+      currentSquadSize++;
+      currentPurse -= basePrice;
+      if (player.contract.isOverseas) currentOverseas++;
+    }
+  }
+
+  return pickedIds;
 }
 
 // ============================================
