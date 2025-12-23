@@ -478,6 +478,7 @@ export type BasePrice = 50 | 75 | 100 | 150 | 200;
 export type AuctionStatus =
   | 'not_started'
   | 'retention_phase'
+  | 'release_phase'
   | 'bidding'
   | 'paused'
   | 'squad_fill'

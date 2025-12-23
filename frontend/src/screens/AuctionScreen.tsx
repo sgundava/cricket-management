@@ -79,10 +79,11 @@ export const AuctionScreen = () => {
   const playerTeam = teams.find((t) => t.id === playerTeamId);
   const teamState = auctionState?.teamStates[playerTeamId];
 
-  // Initialize auction if not already done
+  // Initialize auction if not already done (fallback for loaded games or between-season auctions)
   useEffect(() => {
     if (!auctionState) {
-      // Determine auction type based on start mode
+      // For fresh game starts, auction is initialized in initializeGame
+      // This is a fallback for loaded saves or between-season auctions
       const auctionType = startMode === 'mini-auction' ? 'mini' : 'mega';
       initializeAuction(auctionType);
     }

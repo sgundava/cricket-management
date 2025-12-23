@@ -134,7 +134,7 @@ interface GameStore extends GameState, UIState {
 
   // Auction
   auctionState: AuctionState | null;
-  initializeAuction: (type: AuctionType) => void;
+  initializeAuction: (type: AuctionType, startStatus?: 'release_phase' | 'bidding') => void;
   setRetention: (playerId: string, slot: 1 | 2 | 3 | 4) => void;
   removeRetention: (slot: 1 | 2 | 3 | 4) => void;
   confirmRetentions: () => void;
@@ -275,6 +275,10 @@ export const useGameStore = create<GameStore>()(
           season: 1,
           phase: initialPhase,
           matchDay: 1,
+          // Clear any stale state from previous game
+          liveMatchState: null,
+          auctionState: null,
+          selectedMatchId: null,
         });
 
         // Initialize points table
@@ -289,6 +293,12 @@ export const useGameStore = create<GameStore>()(
           netRunRate: 0,
         }));
         set({ pointsTable });
+
+        // Initialize auction if starting with one
+        if (startMode === 'mini-auction' || startMode === 'mega-auction') {
+          const auctionType = startMode === 'mini-auction' ? 'mini' : 'mega';
+          get().initializeAuction(auctionType);
+        }
       },
 
       resetGame: () => {
@@ -1088,8 +1098,8 @@ export const useGameStore = create<GameStore>()(
           unsoldPlayers: auctionPool, // This will be used by auction pool generation
         });
 
-        // Initialize mini auction
-        get().initializeAuction('mini');
+        // Initialize mini auction with bidding status (release phase is complete)
+        get().initializeAuction('mini', 'bidding');
         get().navigateTo('auction');
       },
 
@@ -1482,7 +1492,7 @@ export const useGameStore = create<GameStore>()(
       // ----------------------------------------
       // Auction
       // ----------------------------------------
-      initializeAuction: (type: AuctionType) => {
+      initializeAuction: (type: AuctionType, startStatus?: 'release_phase' | 'bidding') => {
         const { teams, players, playerTeamId, unsoldPlayers, releasedPlayers } = get();
         const settings = createAuctionSettings(type);
 
@@ -1502,8 +1512,20 @@ export const useGameStore = create<GameStore>()(
         // Create AI strategies
         const aiStrategies = createAIStrategies(teams);
 
+        // Determine initial status:
+        // - Mega auction: retention_phase
+        // - Mini auction: release_phase (unless explicitly starting bidding)
+        let status: AuctionState['status'];
+        if (startStatus) {
+          status = startStatus;
+        } else if (type === 'mega') {
+          status = 'retention_phase';
+        } else {
+          status = 'release_phase';
+        }
+
         const auctionState: AuctionState = {
-          status: type === 'mega' ? 'retention_phase' : 'bidding',
+          status,
           settings,
           auctionType: type,
           currentPlayer: null,
@@ -1948,17 +1970,23 @@ export const useGameStore = create<GameStore>()(
         let updatedTeams = teams.map((team) => {
           const teamState = auctionState.teamStates[team.id];
 
-          // Get retained player IDs
-          const retainedIds = teamState.retentions
-            .filter((r) => r.playerId !== null)
-            .map((r) => r.playerId as string);
-
           // Get bought player IDs
           const boughtIds = auctionState.soldPlayers
             .filter((p) => p.currentBidder === team.id)
             .map((p) => p.playerId);
 
-          const newSquad = [...retainedIds, ...boughtIds];
+          let newSquad: string[];
+          if (auctionState.auctionType === 'mega') {
+            // Mega auction: squad = retained players + bought players
+            const retainedIds = teamState.retentions
+              .filter((r) => r.playerId !== null)
+              .map((r) => r.playerId as string);
+            newSquad = [...retainedIds, ...boughtIds];
+          } else {
+            // Mini auction: squad = existing players + bought players
+            // (existing squad already had releases removed in confirmReleases)
+            newSquad = [...team.squad, ...boughtIds];
+          }
 
           return {
             ...team,

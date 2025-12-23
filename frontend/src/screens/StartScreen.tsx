@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { allPlayers, teams, generateFixtures } from '../data';
-import { GameStartMode, SaveSlot } from '../types';
+import { GameStartMode } from '../types';
 import { formatSaveDate } from '../utils/saveManager';
 
-type SetupStep = 'welcome' | 'mode' | 'team' | 'manager';
+type SetupStep = 'welcome' | 'setup';
 
 export const StartScreen = () => {
   const { loadInitialData, initializeGame, navigateTo, getSaveSlots, loadFromSlot, deleteSlot } = useGameStore();
@@ -15,16 +15,6 @@ export const StartScreen = () => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<1 | 2 | 3 | null>(null);
 
   const saveSlots = getSaveSlots();
-
-  const handleSelectMode = (mode: GameStartMode) => {
-    setStartMode(mode);
-    setStep('team');
-  };
-
-  const handleSelectTeam = (teamId: string) => {
-    setSelectedTeam(teamId);
-    setStep('manager');
-  };
 
   const handleStartGame = () => {
     if (!managerName.trim()) return;
@@ -37,17 +27,13 @@ export const StartScreen = () => {
     initializeGame(selectedTeam, managerName, startMode);
 
     // Navigate based on mode
-    if (startMode === 'mini-auction' || startMode === 'mega-auction') {
+    if (startMode === 'mini-auction') {
+      navigateTo('release-phase');
+    } else if (startMode === 'mega-auction') {
       navigateTo('auction');
     } else {
       navigateTo('home');
     }
-  };
-
-  const handleBack = () => {
-    if (step === 'manager') setStep('team');
-    else if (step === 'team') setStep('mode');
-    else if (step === 'mode') setStep('welcome');
   };
 
   const handleLoadGame = (slotId: 1 | 2 | 3) => {
@@ -66,33 +52,19 @@ export const StartScreen = () => {
 
   return (
     <div className="min-h-screen bg-gray-900 text-white flex flex-col items-center justify-center p-4">
-      <div className="max-w-md w-full space-y-8">
+      <div className="max-w-lg w-full space-y-6">
         {/* Header */}
         <div className="text-center">
           <h1 className="text-4xl font-bold mb-2">Cricket Manager</h1>
           <p className="text-gray-400">Build your dynasty. Make tough calls. Win trophies.</p>
         </div>
 
-        {/* Step Indicator (hide on welcome) */}
-        {step !== 'welcome' && (
-          <div className="flex justify-center gap-2">
-            {['mode', 'team', 'manager'].map((s, i) => (
-              <div
-                key={s}
-                className={`w-3 h-3 rounded-full transition-colors ${
-                  step === s ? 'bg-blue-500' : 'bg-gray-700'
-                }`}
-              />
-            ))}
-          </div>
-        )}
-
         {/* Welcome Screen */}
         {step === 'welcome' && (
           <div className="space-y-4">
             {/* New Game Button */}
             <button
-              onClick={() => setStep('mode')}
+              onClick={() => setStep('setup')}
               className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-lg font-semibold text-lg transition-colors"
             >
               New Game
@@ -161,154 +133,19 @@ export const StartScreen = () => {
           </div>
         )}
 
-        {/* Step 1: Mode Selection */}
-        {step === 'mode' && (
-          <div className="bg-gray-800 rounded-xl p-6 border border-gray-700 space-y-4">
-            <div className="flex items-center gap-2">
-              <button onClick={handleBack} className="text-blue-400 hover:text-blue-300">
-                ←
-              </button>
-              <h2 className="text-lg font-semibold">How do you want to start?</h2>
-            </div>
-            <p className="text-sm text-gray-400">Choose how to build your squad</p>
-
-            <div className="space-y-3">
-              <button
-                onClick={() => handleSelectMode('real-squads')}
-                className="w-full bg-gray-700 hover:bg-gray-600 border border-gray-600 rounded-xl p-4 text-left transition-colors"
-              >
-                <div className="flex items-start gap-3">
-                  <span className="text-2xl">👥</span>
-                  <div>
-                    <h3 className="font-semibold">Use Real Squads</h3>
-                    <p className="text-sm text-gray-400 mt-1">
-                      Start with actual IPL rosters. Your first auction happens after Season 1.
-                    </p>
-                    <div className="mt-2 text-xs text-green-400">Recommended for first-time players</div>
-                  </div>
-                </div>
-              </button>
-
-              <button
-                onClick={() => handleSelectMode('mini-auction')}
-                className="w-full bg-gray-700 hover:bg-gray-600 border border-gray-600 rounded-xl p-4 text-left transition-colors"
-              >
-                <div className="flex items-start gap-3">
-                  <span className="text-2xl">🔄</span>
-                  <div>
-                    <h3 className="font-semibold">Mini Auction</h3>
-                    <p className="text-sm text-gray-400 mt-1">
-                      Teams keep their squads. Release players and bid on free agents.
-                    </p>
-                    <div className="mt-2 text-xs text-blue-400">Tune your squad before Season 1</div>
-                  </div>
-                </div>
-              </button>
-
-              <button
-                onClick={() => handleSelectMode('mega-auction')}
-                className="w-full bg-gray-700 hover:bg-gray-600 border border-gray-600 rounded-xl p-4 text-left transition-colors"
-              >
-                <div className="flex items-start gap-3">
-                  <span className="text-2xl">🏏</span>
-                  <div>
-                    <h3 className="font-semibold">Mega Auction</h3>
-                    <p className="text-sm text-gray-400 mt-1">
-                      All squads reset. Retain up to 4 players, then rebuild from scratch.
-                    </p>
-                    <div className="mt-2 text-xs text-yellow-400">Full control from day one</div>
-                  </div>
-                </div>
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Step 2: Team Selection */}
-        {step === 'team' && (
-          <div className="bg-gray-800 rounded-xl p-6 border border-gray-700 space-y-4">
-            <div className="flex items-center gap-2">
-              <button onClick={handleBack} className="text-blue-400 hover:text-blue-300">
-                ←
-              </button>
-              <h2 className="text-lg font-semibold">Select Your Franchise</h2>
-            </div>
-
-            <p className="text-sm text-gray-400">
-              {startMode === 'real-squads'
-                ? 'Pick a team to manage with their current roster'
-                : startMode === 'mini-auction'
-                  ? 'Pick a team to tune in the mini auction'
-                  : 'Pick a franchise to build in the mega auction'}
-            </p>
-
-            <div className="grid grid-cols-3 gap-2">
-              {teams.map((team) => (
-                <button
-                  key={team.id}
-                  onClick={() => handleSelectTeam(team.id)}
-                  className="p-3 rounded-lg border-2 border-gray-700 bg-gray-700/30 hover:border-blue-500 hover:bg-blue-900/30 transition-all"
-                >
-                  <div
-                    className="w-10 h-10 rounded-full mx-auto mb-2 flex items-center justify-center text-xs font-bold"
-                    style={{ backgroundColor: team.colors.primary }}
-                  >
-                    {team.shortName}
-                  </div>
-                  <div className="text-xs text-center truncate">{team.shortName}</div>
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Step 3: Manager Name */}
-        {step === 'manager' && (
+        {/* Unified Setup Screen */}
+        {step === 'setup' && (
           <div className="bg-gray-800 rounded-xl p-6 border border-gray-700 space-y-6">
             <div className="flex items-center gap-2">
-              <button onClick={handleBack} className="text-blue-400 hover:text-blue-300">
+              <button onClick={() => setStep('welcome')} className="text-blue-400 hover:text-blue-300">
                 ←
               </button>
-              <h2 className="text-lg font-semibold">Enter Your Name</h2>
+              <h2 className="text-lg font-semibold">New Game Setup</h2>
             </div>
 
-            {/* Selected Team Preview */}
-            {selectedTeamData && (
-              <div className="bg-gray-700/50 rounded-lg p-4">
-                <div className="flex items-center gap-3 mb-3">
-                  <div
-                    className="w-12 h-12 rounded-full flex items-center justify-center text-sm font-bold"
-                    style={{ backgroundColor: selectedTeamData.colors.primary }}
-                  >
-                    {selectedTeamData.shortName}
-                  </div>
-                  <div>
-                    <h3 className="font-semibold">{selectedTeamData.name}</h3>
-                    <p className="text-sm text-gray-400">{selectedTeamData.homeCity}</p>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  <div>
-                    <span className="text-gray-400">Budget: </span>
-                    <span className="text-green-400">₹{selectedTeamData.budget} Cr</span>
-                  </div>
-                  <div>
-                    <span className="text-gray-400">Mode: </span>
-                    <span className="text-blue-400">
-                      {startMode === 'real-squads'
-                        ? 'Real Squads'
-                        : startMode === 'mini-auction'
-                          ? 'Mini Auction'
-                          : 'Mega Auction'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Manager Name Input */}
+            {/* Manager Name */}
             <div>
-              <label className="block text-sm text-gray-400 mb-2">Your Name</label>
+              <label className="block text-sm text-gray-400 mb-2">Manager Name</label>
               <input
                 type="text"
                 value={managerName}
@@ -317,6 +154,82 @@ export const StartScreen = () => {
                 className="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
                 autoFocus
               />
+            </div>
+
+            {/* Team Selection */}
+            <div>
+              <label className="block text-sm text-gray-400 mb-2">Select Your Franchise</label>
+              <div className="grid grid-cols-5 gap-2">
+                {teams.map((team) => (
+                  <button
+                    key={team.id}
+                    onClick={() => setSelectedTeam(team.id)}
+                    className={`p-2 rounded-lg border-2 transition-all ${
+                      selectedTeam === team.id
+                        ? 'border-blue-500 bg-blue-900/30'
+                        : 'border-gray-700 bg-gray-700/30 hover:border-gray-500'
+                    }`}
+                  >
+                    <div
+                      className="w-8 h-8 rounded-full mx-auto mb-1 flex items-center justify-center text-xs font-bold"
+                      style={{ backgroundColor: team.colors.primary }}
+                    >
+                      {team.shortName}
+                    </div>
+                    <div className="text-xs text-center truncate">{team.shortName}</div>
+                  </button>
+                ))}
+              </div>
+              {selectedTeamData && (
+                <div className="mt-2 text-sm text-gray-400 text-center">
+                  {selectedTeamData.name} • {selectedTeamData.homeCity}
+                </div>
+              )}
+            </div>
+
+            {/* Auction Type Selection */}
+            <div>
+              <label className="block text-sm text-gray-400 mb-2">Starting Auction</label>
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  onClick={() => setStartMode('real-squads')}
+                  className={`p-3 rounded-lg border-2 text-center transition-all ${
+                    startMode === 'real-squads'
+                      ? 'border-green-500 bg-green-900/30'
+                      : 'border-gray-700 bg-gray-700/30 hover:border-gray-500'
+                  }`}
+                >
+                  <div className="font-semibold text-sm">No Auction</div>
+                  <div className="text-xs text-gray-400 mt-1">Real squads</div>
+                </button>
+                <button
+                  onClick={() => setStartMode('mini-auction')}
+                  className={`p-3 rounded-lg border-2 text-center transition-all ${
+                    startMode === 'mini-auction'
+                      ? 'border-blue-500 bg-blue-900/30'
+                      : 'border-gray-700 bg-gray-700/30 hover:border-gray-500'
+                  }`}
+                >
+                  <div className="font-semibold text-sm">Mini</div>
+                  <div className="text-xs text-gray-400 mt-1">Tune squad</div>
+                </button>
+                <button
+                  onClick={() => setStartMode('mega-auction')}
+                  className={`p-3 rounded-lg border-2 text-center transition-all ${
+                    startMode === 'mega-auction'
+                      ? 'border-yellow-500 bg-yellow-900/30'
+                      : 'border-gray-700 bg-gray-700/30 hover:border-gray-500'
+                  }`}
+                >
+                  <div className="font-semibold text-sm">Mega</div>
+                  <div className="text-xs text-gray-400 mt-1">Full rebuild</div>
+                </button>
+              </div>
+              <div className="mt-2 text-xs text-gray-500 text-center">
+                {startMode === 'real-squads' && 'Start Season 1 with current IPL rosters. First auction after the season.'}
+                {startMode === 'mini-auction' && 'Release players and bid on free agents before Season 1.'}
+                {startMode === 'mega-auction' && 'Retain up to 4 players, then rebuild your squad from scratch.'}
+              </div>
             </div>
 
             {/* Start Button */}

@@ -42,10 +42,15 @@ function App() {
       return;
     }
 
-    // If in auction phase with active auction, navigate to auction screen
+    // If in auction phase with active auction, navigate to appropriate screen
     if (phase === 'auction' && auctionState?.status && auctionState.status !== 'completed') {
       hasNavigatedRef.current = true;
-      navigateTo('auction');
+      // Route to release phase screen for mini auction release phase
+      if (auctionState.status === 'release_phase') {
+        navigateTo('release-phase');
+      } else {
+        navigateTo('auction');
+      }
       return;
     }
 
