@@ -1,5 +1,6 @@
 import React from 'react';
 import { useGameStore } from '../store/gameStore';
+import { COUNTRIES } from '../data/countries';
 
 const MATCH_TYPE_LABELS: Record<string, string> = {
   league: 'League Match',
@@ -9,8 +10,16 @@ const MATCH_TYPE_LABELS: Record<string, string> = {
   final: 'FINAL',
 };
 
+const FORMAT_LABELS: Record<string, string> = {
+  t20: 'T20I',
+  odi: 'ODI',
+  test: 'Test',
+};
+
 export const HomeScreen = () => {
   const {
+    gameMode,
+    country,
     manager,
     playerTeamId,
     teams,
@@ -20,12 +29,252 @@ export const HomeScreen = () => {
     activeEvents,
     phase,
     season,
+    internationalCalendar,
     navigateTo,
     selectMatch,
     selectEvent,
     getSeasonResult,
     checkAndStartPlayoffs,
+    startInternationalMatch,
   } = useGameStore();
+
+  // International Mode Home
+  if (gameMode === 'international' && country) {
+    const countryConfig = COUNTRIES[country];
+    const currentMonth = new Date().getMonth() + 1; // 1-12
+
+    // Get upcoming series from calendar
+    const upcomingSeries = internationalCalendar?.series
+      .filter(s => s.startMonth >= currentMonth)
+      .slice(0, 3) || [];
+
+    const currentSeries = internationalCalendar?.series
+      .find(s => s.startMonth === currentMonth);
+
+    // Get ICC events
+    const upcomingIccEvents = internationalCalendar?.iccEvents || [];
+
+    return (
+      <div className="min-h-screen bg-gray-900 text-white pb-24">
+        {/* Header */}
+        <header className="bg-gradient-to-r from-blue-900 to-indigo-900 p-4 border-b border-blue-700">
+          <div className="max-w-lg mx-auto flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="text-3xl">{countryConfig?.flag}</div>
+              <div>
+                <h1 className="text-xl font-bold">{countryConfig?.name} Cricket</h1>
+                <p className="text-sm text-blue-300">Head Coach: {manager.name}</p>
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="text-sm text-blue-300">ICC Rankings</div>
+              <div className="text-xs text-gray-400">
+                T20: #{countryConfig?.iccRanking.t20} • ODI: #{countryConfig?.iccRanking.odi}
+                {countryConfig?.iccRanking.test && ` • Test: #${countryConfig.iccRanking.test}`}
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <div className="max-w-lg mx-auto p-4 space-y-4">
+          {/* Play Next Match - Primary Action */}
+          {(() => {
+            // Find the next series that has matches remaining
+            const allSeries = internationalCalendar?.series || [];
+
+            // Helper to check if a series has matches remaining
+            const getSeriesProgress = (series: typeof allSeries[0]) => {
+              const matchesPlayed = fixtures.filter(f => f.id.includes(series.id)).length;
+              return { matchesPlayed, remaining: series.matches - matchesPlayed };
+            };
+
+            // Sort series by start month to play in chronological order
+            const sortedSeries = [...allSeries].sort((a, b) => a.startMonth - b.startMonth);
+
+            // Find first series (chronologically) with matches remaining
+            const nextAvailableSeries = sortedSeries.find(s => getSeriesProgress(s).remaining > 0);
+
+            if (!nextAvailableSeries) {
+              // All series complete
+              return (
+                <div className="bg-gradient-to-r from-green-900/50 to-emerald-900/50 rounded-xl p-4 border border-green-700 text-center">
+                  <div className="text-2xl mb-2">🏆</div>
+                  <h3 className="text-lg font-bold text-green-400">Season Complete!</h3>
+                  <p className="text-sm text-gray-400 mt-2">You've completed all scheduled series.</p>
+                </div>
+              );
+            }
+
+            const { matchesPlayed, remaining } = getSeriesProgress(nextAvailableSeries);
+            const nextMatchNum = matchesPlayed + 1;
+
+            return (
+            <div className="bg-gradient-to-r from-blue-900/50 to-indigo-900/50 rounded-xl p-4 border border-blue-700">
+              <div className="flex justify-between items-center mb-3">
+                <span className="text-sm font-medium text-blue-400">
+                  MATCH {nextMatchNum} OF {nextAvailableSeries.matches}
+                </span>
+                <span className="text-xs bg-blue-600 px-2 py-1 rounded">
+                  {FORMAT_LABELS[nextAvailableSeries.format]}
+                </span>
+              </div>
+              <div className="flex items-center gap-4 mb-4">
+                <div className="text-3xl">{countryConfig?.flag}</div>
+                <div className="text-gray-500 text-lg">vs</div>
+                <div className="text-3xl">
+                  {COUNTRIES[nextAvailableSeries.opponent]?.flag}
+                </div>
+              </div>
+              <div className="text-sm text-gray-400 text-center mb-3">
+                {nextAvailableSeries.name}
+                {nextAvailableSeries.trophy && (
+                  <span className="text-yellow-400 ml-2">
+                    {nextAvailableSeries.trophy}
+                  </span>
+                )}
+              </div>
+              <button
+                onClick={() => {
+                  startInternationalMatch(nextAvailableSeries.id, nextMatchNum);
+                  navigateTo('match-prep');
+                }}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-bold transition-colors"
+              >
+                Play Match
+              </button>
+            </div>
+            );
+          })()}
+
+          {/* Current/Next Series Info */}
+          {currentSeries ? (
+            <div className="bg-gradient-to-r from-green-900/50 to-emerald-900/50 rounded-xl p-4 border border-green-700">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-sm font-medium text-green-400">ONGOING SERIES</span>
+                <span className="text-xs bg-green-600 px-2 py-1 rounded">{FORMAT_LABELS[currentSeries.format]}</span>
+              </div>
+              <h3 className="text-lg font-bold mb-2">{currentSeries.name}</h3>
+              {currentSeries.trophy && (
+                <div className="text-sm text-yellow-400 mb-2">{currentSeries.trophy}</div>
+              )}
+              <div className="flex items-center justify-between text-sm text-gray-400">
+                <span>{currentSeries.matches} Matches</span>
+                <span className="capitalize">{currentSeries.venue} Series</span>
+              </div>
+              <button
+                onClick={() => navigateTo('schedule')}
+                className="w-full mt-3 bg-green-600/50 hover:bg-green-600 text-white py-2 rounded-lg font-medium transition-colors"
+              >
+                View Full Series
+              </button>
+            </div>
+          ) : upcomingSeries.length > 0 ? (
+            <div className="bg-gray-800 rounded-xl p-4 border border-gray-700">
+              <h3 className="text-sm font-semibold text-gray-400 mb-3">UPCOMING SERIES</h3>
+              {upcomingSeries.slice(0, 2).map(series => (
+                <div key={series.id} className="flex items-center gap-3 mb-3 last:mb-0">
+                  <div className="text-xl">{COUNTRIES[series.opponent]?.flag}</div>
+                  <div className="flex-1">
+                    <div className="text-sm font-medium">{series.name}</div>
+                    <div className="text-xs text-gray-400">
+                      {FORMAT_LABELS[series.format]} • {series.matches} Matches
+                    </div>
+                  </div>
+                </div>
+              ))}
+              <button
+                onClick={() => navigateTo('schedule')}
+                className="w-full mt-2 bg-gray-700 hover:bg-gray-600 text-white py-2 rounded-lg font-medium transition-colors"
+              >
+                View Calendar
+              </button>
+            </div>
+          ) : (
+            <div className="bg-gray-800 rounded-xl p-4 border border-gray-700 text-center">
+              <p className="text-gray-400">No upcoming series scheduled</p>
+            </div>
+          )}
+
+          {/* ICC Events */}
+          {upcomingIccEvents.length > 0 && (
+            <div className="bg-gradient-to-r from-purple-900/30 to-pink-900/30 rounded-xl p-4 border border-purple-700">
+              <h3 className="text-sm font-semibold text-purple-400 mb-3">ICC EVENTS</h3>
+              {upcomingIccEvents.slice(0, 2).map(event => (
+                <div key={event.id} className="flex items-center justify-between py-2 border-b border-purple-800/50 last:border-0">
+                  <div>
+                    <div className="font-medium text-sm">{event.name}</div>
+                    <div className="text-xs text-gray-400">
+                      {event.hostCountries.map(c => COUNTRIES[c]?.flag).join(' ')} • {FORMAT_LABELS[event.format]}
+                    </div>
+                  </div>
+                  <div className="text-xs text-purple-300">
+                    {event.participatingTeams} Teams
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Manager Stats */}
+          <div className="bg-gray-800 rounded-xl p-4 border border-gray-700">
+            <h3 className="text-sm font-semibold text-gray-400 mb-3">YOUR RECORD</h3>
+            <div className="grid grid-cols-4 gap-2 text-center">
+              <div>
+                <div className="text-lg font-bold text-blue-400">{manager.history.testSeriesWon}</div>
+                <div className="text-xs text-gray-500">Test W</div>
+              </div>
+              <div>
+                <div className="text-lg font-bold text-green-400">{manager.history.odiSeriesWon}</div>
+                <div className="text-xs text-gray-500">ODI W</div>
+              </div>
+              <div>
+                <div className="text-lg font-bold text-purple-400">{manager.history.t20SeriesWon}</div>
+                <div className="text-xs text-gray-500">T20 W</div>
+              </div>
+              <div>
+                <div className="text-lg font-bold text-yellow-400">{manager.history.iccEventsWon}</div>
+                <div className="text-xs text-gray-500">ICC</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Quick Links */}
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              onClick={() => navigateTo('schedule')}
+              className="bg-gray-800 rounded-xl p-4 border border-gray-700 text-left hover:bg-gray-700/50 transition-colors"
+            >
+              <div className="text-lg mb-1">📅</div>
+              <div className="text-sm font-medium">Calendar</div>
+              <div className="text-xs text-gray-500">Series & ICC events</div>
+            </button>
+            <button
+              onClick={() => navigateTo('squad')}
+              className="bg-gray-800 rounded-xl p-4 border border-gray-700 text-left hover:bg-gray-700/50 transition-colors"
+            >
+              <div className="text-lg mb-1">👥</div>
+              <div className="text-sm font-medium">Squad</div>
+              <div className="text-xs text-gray-500">National team pool</div>
+            </button>
+          </div>
+
+          {/* Reputation */}
+          <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700">
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-gray-400">International Reputation</span>
+              <span className="font-bold text-blue-400">{manager.reputation.international}</span>
+            </div>
+            <div className="mt-2 h-2 bg-gray-700 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-blue-500 transition-all"
+                style={{ width: `${manager.reputation.international}%` }}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const playerTeam = teams.find((t) => t.id === playerTeamId);
   const teamPlayers = players.filter((p) => playerTeam?.squad.includes(p.id));

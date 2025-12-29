@@ -275,7 +275,7 @@ export const ClubScreen = () => {
             </div>
             <div>
               <div className="font-bold">{manager.name}</div>
-              <div className="text-sm text-gray-400">Reputation: {manager.reputation}</div>
+              <div className="text-sm text-gray-400">Reputation: {manager.reputation.domestic}</div>
             </div>
           </div>
 

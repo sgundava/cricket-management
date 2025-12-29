@@ -1,0 +1,34 @@
+# Probability parameters for TEST cricket
+# Auto-generated from cricsheet data analysis
+# Generated: 2025-12-23 19:50:41
+
+base_outcomes:
+  dot: 0.7265
+  single: 0.1471
+  two: 0.0360
+  three: 0.0090
+  four: 0.0604
+  six: 0.0042
+  wicket: 0.0167
+
+phase_modifiers:
+  new_ball:
+    boundary_mod: 1.03
+    wicket_mod: 0.96
+    run_rate_target: 3.1
+  middle:
+    boundary_mod: 0.96
+    wicket_mod: 0.96
+    run_rate_target: 3.2
+  old_ball:
+    boundary_mod: 1.03
+    wicket_mod: 1.15
+    run_rate_target: 3.4
+
+dismissals:
+  caught: 0.5875
+  bowled: 0.1754
+  lbw: 0.1684
+  run_out: 0.0271
+  caught_and_bowled: 0.0215
+  stumped: 0.0178

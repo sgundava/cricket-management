@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { PlayerCard } from '../components/PlayerCard';
 import { Player, MatchTactics, TacticalApproach, PlayerInstruction, BattingInstruction, BowlingInstruction, BowlingLength, FieldSetting, BowlingApproach } from '../types';
+import { COUNTRIES } from '../data/countries';
 
 type Step = 'select' | 'tactics' | 'review';
 
@@ -43,6 +44,8 @@ export const MatchPrepScreen = () => {
     fixtures,
     setMatchTactics,
     navigateTo,
+    gameMode,
+    country,
   } = useGameStore();
 
   const [step, setStep] = useState<Step>('select');
@@ -63,7 +66,13 @@ export const MatchPrepScreen = () => {
 
   const match = fixtures.find((m) => m.id === selectedMatchId);
   const playerTeam = teams.find((t) => t.id === playerTeamId);
-  const teamPlayers = players.filter((p) => playerTeam?.squad.includes(p.id));
+
+  // For international mode, use national pool; for franchise mode, use team squad
+  const isInternationalMode = gameMode === 'international' && country;
+  const nationalityName = isInternationalMode ? COUNTRIES[country]?.name : null;
+  const teamPlayers = isInternationalMode
+    ? players.filter((p) => p.nationality === nationalityName)
+    : players.filter((p) => playerTeam?.squad.includes(p.id));
 
   const opponent = match
     ? teams.find((t) => t.id === (match.homeTeam === playerTeamId ? match.awayTeam : match.homeTeam))
@@ -76,11 +85,12 @@ export const MatchPrepScreen = () => {
     }
   }, [match, navigateTo]);
 
-  // Count overseas players in selection
+  // Count overseas players in selection (only relevant for franchise mode)
   const overseasCount = useMemo(
-    () => selectedPlayers.filter((id) => players.find((p) => p.id === id)?.contract.isOverseas).length,
-    [selectedPlayers, players]
+    () => isInternationalMode ? 0 : selectedPlayers.filter((id) => players.find((p) => p.id === id)?.contract.isOverseas).length,
+    [selectedPlayers, players, isInternationalMode]
   );
+  const maxOverseas = isInternationalMode ? 11 : 4; // No overseas limit in international mode
 
   // Validation
   const hasKeeper = useMemo(
@@ -124,7 +134,7 @@ export const MatchPrepScreen = () => {
 
     // Helper to check if we can add a player
     const canAdd = (p: Player) => {
-      if (p.contract.isOverseas && overseasUsed >= 4) return false;
+      if (!isInternationalMode && p.contract.isOverseas && overseasUsed >= maxOverseas) return false;
       return true;
     };
 
@@ -233,7 +243,7 @@ export const MatchPrepScreen = () => {
     } else {
       // Check constraints
       if (selectedPlayers.length >= 11) return;
-      if (player.contract.isOverseas && overseasCount >= 4) return;
+      if (!isInternationalMode && player.contract.isOverseas && overseasCount >= maxOverseas) return;
 
       setSelectedPlayers([...selectedPlayers, playerId]);
     }
@@ -331,7 +341,9 @@ export const MatchPrepScreen = () => {
             <button onClick={() => navigateTo('home')} className="text-blue-400">
               ← Back
             </button>
-            <span className="text-sm text-gray-400">vs {opponent.shortName}</span>
+            <span className="text-sm text-gray-400">
+              {isInternationalMode ? `${nationalityName}` : ''} vs {isInternationalMode ? 'Opponent' : opponent.shortName}
+            </span>
           </div>
 
           {/* Steps */}
@@ -369,9 +381,11 @@ export const MatchPrepScreen = () => {
                 >
                   Auto-Select
                 </button>
-                <span className={`text-sm ${overseasCount > 4 ? 'text-red-400' : 'text-gray-400'}`}>
-                  Overseas: {overseasCount}/4
-                </span>
+                {!isInternationalMode && (
+                  <span className={`text-sm ${overseasCount > maxOverseas ? 'text-red-400' : 'text-gray-400'}`}>
+                    Overseas: {overseasCount}/{maxOverseas}
+                  </span>
+                )}
               </div>
             </div>
 

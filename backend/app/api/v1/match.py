@@ -1,6 +1,6 @@
 """Match simulation API endpoints."""
 
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from fastapi import APIRouter, HTTPException
 
@@ -20,22 +20,30 @@ from app.schemas.match import (
     BatterStats,
 )
 from app.schemas.player import PlayerStats
-from app.schemas.common import MatchPhase
+from app.schemas.common import MatchPhase, MatchFormat, get_format_config
 from app.engine.match_engine import MatchEngine
 from app.engine.probability_model import get_probability_model
 
 router = APIRouter()
 
-# Singleton engine instance
-_engine: Optional[MatchEngine] = None
+# Cache engines per format
+_engines: Dict[str, MatchEngine] = {}
 
 
-def get_engine() -> MatchEngine:
-    """Get or create match engine instance."""
-    global _engine
-    if _engine is None:
-        _engine = MatchEngine(get_probability_model())
-    return _engine
+def get_engine(format_name: str = "t20") -> MatchEngine:
+    """Get or create match engine instance for the specified format."""
+    global _engines
+    format_key = format_name.lower()
+
+    if format_key not in _engines:
+        format_config = get_format_config(format_key)
+        probability_model = get_probability_model(format_key)
+        _engines[format_key] = MatchEngine(
+            probability_model=probability_model,
+            format_config=format_config,
+        )
+
+    return _engines[format_key]
 
 
 @router.post("/simulate/ball", response_model=SimulateBallResponse)
@@ -45,8 +53,9 @@ async def simulate_ball(request: SimulateBallRequest):
 
     Takes the current innings state, players involved, tactics, and conditions.
     Returns the outcome, narrative, and updated state information.
+    Supports T20, ODI, and Test formats via match_format parameter.
     """
-    engine = get_engine()
+    engine = get_engine(request.match_format)
 
     try:
         outcome, narrative, probs = engine.simulate_ball(
@@ -95,8 +104,8 @@ async def simulate_ball(request: SimulateBallRequest):
             current_batters = [current_batters[1], current_batters[0]]
             striker_changed = not striker_changed
 
-        # Check innings completion
-        if new_overs >= 20:
+        # Check innings completion (use format-specific overs)
+        if new_overs >= engine.TOTAL_OVERS:
             innings_complete = True
         if request.target and new_runs >= request.target:
             innings_complete = True
@@ -141,8 +150,9 @@ async def simulate_over(request: SimulateOverRequest):
 
     Takes the current innings state, full team rosters, and tactics.
     Returns the over summary, updated innings state, and narratives.
+    Supports T20, ODI, and Test formats via match_format parameter.
     """
-    engine = get_engine()
+    engine = get_engine(request.match_format)
 
     # Find the bowler
     bowler = next(

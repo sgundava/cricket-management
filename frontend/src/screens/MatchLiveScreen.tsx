@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useGameStore } from '../store/gameStore';
-import { simulateOver as clientSimulateOver, simulateSingleBall, generateDefaultTactics, selectSmartBowler } from '../engine/matchEngine';
+import { simulateOver as clientSimulateOver, simulateSingleBall, generateDefaultTactics, selectSmartBowler, getFormatConfig } from '../engine/matchEngine';
 import { InningsState, OverSummary, Player, MatchTactics, BallEvent, SerializedInningsState, BowlingLength, FieldSetting } from '../types';
 import {
   simulateOver as backendSimulateOver,
   isUsingBackend,
 } from '../services';
+import { COUNTRIES } from '../data/countries';
 
 // Bowling length options for live override
 const BOWLING_LENGTH_OPTIONS: { value: BowlingLength; label: string }[] = [
@@ -58,15 +59,20 @@ export const MatchLiveScreen = () => {
     liveMatchState,
     saveLiveMatchState,
     clearLiveMatchState,
+    gameMode,
+    country,
+    internationalCalendar,
   } = useGameStore();
 
   const [isSimulating, setIsSimulating] = useState(false);
-  const [currentInnings, setCurrentInnings] = useState<1 | 2>(1);
+  const [currentInnings, setCurrentInnings] = useState<1 | 2 | 3 | 4>(1);
   const [inningsState, setInningsState] = useState<InningsState | null>(null);
   const [lastOver, setLastOver] = useState<OverSummary | null>(null);
   const [matchEnded, setMatchEnded] = useState(false);
   const [firstInningsTotal, setFirstInningsTotal] = useState<number>(0);
   const [result, setResult] = useState<{ winner: string; margin: string } | null>(null);
+  // Test cricket: track all innings totals [innings1, innings2, innings3, innings4]
+  const [inningsTotals, setInningsTotals] = useState<[number, number, number, number]>([0, 0, 0, 0]);
 
   // Ball-by-ball state
   const [recentBalls, setRecentBalls] = useState<BallEvent[]>([]);
@@ -97,8 +103,45 @@ export const MatchLiveScreen = () => {
   const homeTeam = teams.find((t) => t.id === match?.homeTeam);
   const awayTeam = teams.find((t) => t.id === match?.awayTeam);
 
-  const homePlayers = players.filter((p) => homeTeam?.squad.includes(p.id));
-  const awayPlayers = players.filter((p) => awayTeam?.squad.includes(p.id));
+  // International mode handling
+  const isInternationalMode = gameMode === 'international' && country;
+  const playerCountryName = isInternationalMode ? COUNTRIES[country]?.name : null;
+
+  // Get opponent info from international calendar if in international mode
+  const currentSeries = isInternationalMode
+    ? internationalCalendar?.series.find(s => match?.id.includes(s.id))
+    : null;
+  const opponentCountry = currentSeries?.opponent;
+  const opponentCountryName = opponentCountry ? COUNTRIES[opponentCountry]?.name : null;
+
+  // Determine if player's country is the home team
+  // Use series venue if available, otherwise fall back to checking if playerTeamId matches homeTeam
+  const isPlayerCountryHome = currentSeries
+    ? currentSeries.venue === 'home'
+    : playerTeamId === match?.homeTeam;
+
+  // Team display names for international mode
+  const homeTeamName = isInternationalMode
+    ? (isPlayerCountryHome ? playerCountryName : opponentCountryName) || 'Home'
+    : homeTeam?.name;
+  const awayTeamName = isInternationalMode
+    ? (isPlayerCountryHome ? opponentCountryName : playerCountryName) || 'Away'
+    : awayTeam?.name;
+  const homeTeamShortName = isInternationalMode
+    ? (isPlayerCountryHome ? country : opponentCountry) || 'HOM'
+    : homeTeam?.shortName;
+  const awayTeamShortName = isInternationalMode
+    ? (isPlayerCountryHome ? opponentCountry : country) || 'AWY'
+    : awayTeam?.shortName;
+
+  // Player pools - use nationality for international mode
+  // For international mode, determine pools based on who is home/away
+  const homePlayers = isInternationalMode
+    ? players.filter((p) => p.nationality === (isPlayerCountryHome ? playerCountryName : opponentCountryName))
+    : players.filter((p) => homeTeam?.squad.includes(p.id));
+  const awayPlayers = isInternationalMode
+    ? players.filter((p) => p.nationality === (isPlayerCountryHome ? opponentCountryName : playerCountryName))
+    : players.filter((p) => awayTeam?.squad.includes(p.id));
 
   const isPlayerHome = playerTeamId === match?.homeTeam;
   const playerTactics = isPlayerHome ? match?.homeTactics : match?.awayTactics;
@@ -107,11 +150,27 @@ export const MatchLiveScreen = () => {
   // Generate AI tactics if not set
   const getAITactics = useCallback(
     (teamId: string): MatchTactics => {
-      const team = teams.find((t) => t.id === teamId);
-      const teamPlayersList = players.filter((p) => team?.squad.includes(p.id));
-      return generateDefaultTactics(teamPlayersList, team?.captain || '');
+      let teamPlayersList: Player[];
+      let captain = '';
+
+      if (isInternationalMode && currentSeries) {
+        // For international mode, determine if this is the player's country or opponent
+        const isPlayerTeam = teamId === playerTeamId;
+        const nationalityToUse = isPlayerTeam ? playerCountryName : opponentCountryName;
+        teamPlayersList = players.filter((p) => p.nationality === nationalityToUse);
+        // Pick the highest rated player as captain
+        captain = teamPlayersList.sort((a, b) =>
+          (b.batting.technique + b.bowling.accuracy) - (a.batting.technique + a.bowling.accuracy)
+        )[0]?.id || '';
+      } else {
+        const team = teams.find((t) => t.id === teamId);
+        teamPlayersList = players.filter((p) => team?.squad.includes(p.id));
+        captain = team?.captain || '';
+      }
+
+      return generateDefaultTactics(teamPlayersList, captain);
     },
-    [teams, players]
+    [teams, players, isInternationalMode, currentSeries, playerTeamId, playerCountryName, opponentCountryName]
   );
 
   // Track if we've initialized (to avoid re-init on re-renders)
@@ -130,6 +189,10 @@ export const MatchLiveScreen = () => {
       setCurrentInnings(liveMatchState.currentInnings);
       setFirstInningsTotal(liveMatchState.firstInningsTotal);
       setRecentBalls(liveMatchState.recentBalls);
+      // Restore innings totals for Test cricket
+      if (liveMatchState.inningsTotals) {
+        setInningsTotals(liveMatchState.inningsTotals);
+      }
       hasInitialized.current = true;
 
       // Mark match as in progress
@@ -190,7 +253,7 @@ export const MatchLiveScreen = () => {
       tossDecision,
       currentInnings: 1,
     });
-  }, [match?.id]);
+  }, [match?.id, playerTactics]);
 
   // Save live match state whenever it changes (for persistence across refreshes)
   useEffect(() => {
@@ -202,8 +265,9 @@ export const MatchLiveScreen = () => {
       inningsState: serializeInningsState(inningsState),
       firstInningsTotal,
       recentBalls,
+      inningsTotals,  // Save Test cricket innings totals
     });
-  }, [inningsState, currentInnings, firstInningsTotal, recentBalls, match?.id, matchEnded]);
+  }, [inningsState, currentInnings, firstInningsTotal, recentBalls, match?.id, matchEnded, inningsTotals]);
 
   // Simulate next over (async with backend fallback)
   const simulateNextOver = useCallback(async () => {
@@ -229,8 +293,9 @@ export const MatchLiveScreen = () => {
         ? match.homeTactics || getAITactics(match.homeTeam)
         : match.awayTactics || getAITactics(match.awayTeam);
 
-    // Select bowler (with 4-over limit enforcement)
-    const MAX_OVERS_PER_BOWLER = 4;
+    // Select bowler (with max overs limit based on format)
+    const formatConfig = getFormatConfig(match.format || 't20');
+    const MAX_OVERS_PER_BOWLER = formatConfig.maxOversPerBowler;
     const bowlers = bowlingTeamPlayers.filter(
       (p) =>
         (p.role === 'bowler' || p.role === 'allrounder') &&
@@ -308,7 +373,9 @@ export const MatchLiveScreen = () => {
         inningsState,
         battingTactics,
         match.pitch,
-        target
+        target,
+        formatConfig.totalOvers,
+        formatConfig.maxOversPerBowler
       );
       overSummary = clientResult.overSummary;
       updatedInnings = clientResult.updatedInnings;
@@ -319,20 +386,72 @@ export const MatchLiveScreen = () => {
     setLastOver(overSummary);
     setInningsState(updatedInnings);
 
-    // Check innings end conditions
-    const inningsEnded =
-      updatedInnings.overs >= 20 ||
-      updatedInnings.wickets >= 10 ||
-      (currentInnings === 2 && updatedInnings.runs >= (firstInningsTotal + 1));
+    // Check innings end conditions based on format
+    const isTestFormat = match.format === 'test';
+    const totalInnings = isTestFormat ? 4 : 2;
 
-    if (inningsEnded) {
-      if (currentInnings === 1) {
-        // Start second innings
-        setFirstInningsTotal(updatedInnings.runs);
-        setCurrentInnings(2);
+    // For Test: innings ends on all out only (or declaration - not implemented yet)
+    // For T20/ODI: innings ends on overs limit, all out, or target achieved
+    const inningsEnded = isTestFormat
+      ? updatedInnings.wickets >= 10
+      : (updatedInnings.overs >= formatConfig.totalOvers ||
+         updatedInnings.wickets >= 10 ||
+         (currentInnings === 2 && updatedInnings.runs >= (firstInningsTotal + 1)));
 
-        const newBattingTeam = bowlingTeamId;
-        const newBowlingTeam = battingTeamId;
+    // For Test 4th innings: also check if target achieved
+    const test4thInningsChaseComplete = isTestFormat && currentInnings === 4 && (() => {
+      // Calculate target: Team A total (innings 1 + 3) - Team B innings 2 + 1
+      const teamATotal = inningsTotals[0] + inningsTotals[2];
+      const teamBInnings2 = inningsTotals[1];
+      const target = teamATotal - teamBInnings2 + 1;
+      return updatedInnings.runs >= target;
+    })();
+
+    if (inningsEnded || test4thInningsChaseComplete) {
+      // Update innings totals for Test cricket
+      if (isTestFormat) {
+        const newTotals = [...inningsTotals] as [number, number, number, number];
+        newTotals[currentInnings - 1] = updatedInnings.runs;
+        setInningsTotals(newTotals);
+      }
+
+      if (currentInnings < totalInnings && !test4thInningsChaseComplete) {
+        // Start next innings
+        const nextInnings = (currentInnings + 1) as 1 | 2 | 3 | 4;
+
+        // For T20/ODI: batting teams swap
+        // For Test: innings 1&3 = same team, innings 2&4 = same team
+        let newBattingTeam: string;
+        let newBowlingTeam: string;
+
+        if (isTestFormat) {
+          // Test cricket: odd innings (1,3) = team that won toss, even innings (2,4) = other team
+          // Get who batted first from innings 1 or current context
+          const firstInningsBatter = match.innings1?.battingTeam || battingTeamId;
+          const firstInningsBowler = match.innings1?.bowlingTeam || bowlingTeamId;
+
+          if (nextInnings % 2 === 1) {
+            // Odd innings (3rd) - same as 1st
+            newBattingTeam = firstInningsBatter;
+            newBowlingTeam = firstInningsBowler;
+          } else {
+            // Even innings (2nd, 4th) - opposite of 1st
+            newBattingTeam = firstInningsBowler;
+            newBowlingTeam = firstInningsBatter;
+          }
+        } else {
+          // T20/ODI: just swap teams
+          newBattingTeam = bowlingTeamId;
+          newBowlingTeam = battingTeamId;
+        }
+
+        // For backwards compatibility with firstInningsTotal (used in 2-innings formats)
+        if (currentInnings === 1) {
+          setFirstInningsTotal(updatedInnings.runs);
+        }
+
+        setCurrentInnings(nextInnings);
+
         const newBattingTactics =
           newBattingTeam === match.homeTeam
             ? match.homeTactics || getAITactics(match.homeTeam)
@@ -353,9 +472,11 @@ export const MatchLiveScreen = () => {
           bowlerStats: new Map(),
         });
 
+        // Update match with completed innings
+        const inningsKey = `innings${currentInnings}` as 'innings1' | 'innings2' | 'innings3' | 'innings4';
         updateMatch(match.id, {
-          currentInnings: 2,
-          innings1: updatedInnings,
+          currentInnings: nextInnings,
+          [inningsKey]: updatedInnings,
         });
       } else {
         // Match ended
@@ -363,26 +484,62 @@ export const MatchLiveScreen = () => {
         setIsSimulating(false);
         clearLiveMatchState(); // Clear persisted state
 
-        const team1 = teams.find((t) => t.id === match.innings1?.battingTeam);
-        const team2 = teams.find((t) => t.id === updatedInnings.battingTeam);
+        // Update final innings totals for Test
+        const finalInningsTotals = [...inningsTotals] as [number, number, number, number];
+        finalInningsTotals[currentInnings - 1] = updatedInnings.runs;
 
-        let winnerTeam: typeof team1 | typeof team2;
+        let winnerTeam: typeof teams[0] | undefined;
         let margin: string;
 
-        if (updatedInnings.runs >= firstInningsTotal + 1) {
-          winnerTeam = team2;
-          margin = `${10 - updatedInnings.wickets} wickets`;
-        } else if (updatedInnings.runs < firstInningsTotal) {
-          winnerTeam = team1;
-          margin = `${firstInningsTotal - updatedInnings.runs} runs`;
+        if (isTestFormat) {
+          // Test cricket: compare total runs across both innings for each team
+          // Team A batted innings 1 & 3, Team B batted innings 2 & 4
+          const teamAId = match.innings1?.battingTeam;
+          const teamBId = match.innings1?.bowlingTeam;
+          const teamA = teams.find((t) => t.id === teamAId);
+          const teamB = teams.find((t) => t.id === teamBId);
+
+          const teamATotal = finalInningsTotals[0] + finalInningsTotals[2];
+          const teamBTotal = finalInningsTotals[1] + updatedInnings.runs;
+
+          if (teamBTotal > teamATotal) {
+            // Team B won in 4th innings
+            winnerTeam = teamB;
+            margin = `${10 - updatedInnings.wickets} wickets`;
+          } else if (teamATotal > teamBTotal) {
+            // Team A won
+            winnerTeam = teamA;
+            margin = `${teamATotal - teamBTotal} runs`;
+          } else {
+            // Tie (very rare in Tests, usually called a draw)
+            winnerTeam = undefined;
+            margin = 'Match Drawn';
+          }
         } else {
-          winnerTeam = undefined;
-          margin = 'Tie';
+          // T20/ODI: original 2-innings logic
+          const team1 = teams.find((t) => t.id === match.innings1?.battingTeam);
+          const team2 = teams.find((t) => t.id === updatedInnings.battingTeam);
+
+          if (updatedInnings.runs >= firstInningsTotal + 1) {
+            winnerTeam = team2;
+            margin = `${10 - updatedInnings.wickets} wickets`;
+          } else if (updatedInnings.runs < firstInningsTotal) {
+            winnerTeam = team1;
+            margin = `${firstInningsTotal - updatedInnings.runs} runs`;
+          } else {
+            winnerTeam = undefined;
+            margin = 'Tie';
+          }
         }
 
+        // Get winner display name for international mode
+        const winnerDisplayName = isInternationalMode
+          ? (winnerTeam?.id === match.homeTeam ? homeTeamName : awayTeamName)
+          : winnerTeam?.name;
+
         setResult({
-          winner: winnerTeam?.name || 'Tie',
-          margin: winnerTeam ? margin : 'Match Tied',
+          winner: winnerDisplayName || (isTestFormat ? 'Draw' : 'Tie'),
+          margin: winnerTeam ? margin : (isTestFormat ? 'Match Drawn' : 'Match Tied'),
         });
 
         // Only update points table for league matches (not playoffs)
@@ -442,9 +599,11 @@ export const MatchLiveScreen = () => {
         updatePointsTable(newPointsTable);
         } // End of league-only points table update
 
+        // Save the final innings
+        const finalInningsKey = `innings${currentInnings}` as 'innings1' | 'innings2' | 'innings3' | 'innings4';
         updateMatch(match.id, {
           status: 'completed',
-          innings2: updatedInnings,
+          [finalInningsKey]: updatedInnings,
         });
 
         // Update player fatigue based on actual participation
@@ -548,7 +707,7 @@ export const MatchLiveScreen = () => {
         });
       }
     }
-  }, [match, inningsState, currentInnings, firstInningsTotal, matchEnded, homePlayers, awayPlayers, selectedNextBowler, playerTeamId, isLoading, liveBowlingLength, liveFieldSetting]);
+  }, [match, inningsState, currentInnings, firstInningsTotal, matchEnded, homePlayers, awayPlayers, selectedNextBowler, playerTeamId, isLoading, liveBowlingLength, liveFieldSetting, isInternationalMode, homeTeamName, awayTeamName]);
 
   // Simulate next ball
   const simulateNextBall = useCallback(() => {
@@ -572,8 +731,9 @@ export const MatchLiveScreen = () => {
         ? match.homeTactics || getAITactics(match.homeTeam)
         : match.awayTactics || getAITactics(match.awayTeam);
 
-    // Get or select bowler
-    const MAX_OVERS_PER_BOWLER = 4;
+    // Get or select bowler (format-aware max overs per bowler)
+    const formatConfig = getFormatConfig(match.format || 't20');
+    const MAX_OVERS_PER_BOWLER = formatConfig.maxOversPerBowler;
     const bowlers = bowlingTeamPlayers.filter(
       (p) =>
         (p.role === 'bowler' || p.role === 'allrounder') &&
@@ -617,7 +777,19 @@ export const MatchLiveScreen = () => {
 
     if (!bowler) return;
 
-    const target = currentInnings === 2 ? firstInningsTotal + 1 : null;
+    // Calculate target based on format and innings
+    const isTestFormat = match.format === 'test';
+    let target: number | null = null;
+
+    if (isTestFormat && currentInnings === 4) {
+      // Test 4th innings: target = Team A total (innings 1+3) - Team B innings 2 + 1
+      const teamATotal = inningsTotals[0] + inningsTotals[2];
+      const teamBInnings2 = inningsTotals[1];
+      target = teamATotal - teamBInnings2 + 1;
+    } else if (!isTestFormat && currentInnings === 2) {
+      // T20/ODI: target is first innings total + 1
+      target = firstInningsTotal + 1;
+    }
 
     // Get batting team in correct batting order (as per playingXI)
     const battingTeamInOrder = battingTactics.playingXI
@@ -630,7 +802,8 @@ export const MatchLiveScreen = () => {
       inningsState,
       battingTactics,
       match.pitch,
-      target
+      target,
+      formatConfig.totalOvers
     );
 
     // Add to recent balls
@@ -645,13 +818,52 @@ export const MatchLiveScreen = () => {
 
     // Handle innings end
     if (inningsComplete) {
-      if (currentInnings === 1) {
-        // Start second innings
-        setFirstInningsTotal(updatedInnings.runs);
-        setCurrentInnings(2);
+      const totalInnings = isTestFormat ? 4 : 2;
+
+      // Update innings totals for Test cricket
+      if (isTestFormat) {
+        const newTotals = [...inningsTotals] as [number, number, number, number];
+        newTotals[currentInnings - 1] = updatedInnings.runs;
+        setInningsTotals(newTotals);
+      }
+
+      // Check if 4th innings chase is complete
+      const test4thInningsChaseComplete = isTestFormat && currentInnings === 4 &&
+        target !== null && updatedInnings.runs >= target;
+
+      if (currentInnings < totalInnings && !test4thInningsChaseComplete) {
+        // Start next innings
+        const nextInnings = (currentInnings + 1) as 1 | 2 | 3 | 4;
+
+        // For backwards compatibility
+        if (currentInnings === 1) {
+          setFirstInningsTotal(updatedInnings.runs);
+        }
+
+        setCurrentInnings(nextInnings);
         setRecentBalls([]);
 
-        const newBattingTeam = bowlingTeamId;
+        // Determine batting teams based on format
+        let newBattingTeam: string;
+        let newBowlingTeam: string;
+
+        if (isTestFormat) {
+          // Test cricket: odd innings (1,3) = team that won toss, even innings (2,4) = other team
+          const firstInningsBatter = match.innings1?.battingTeam || battingTeamId;
+          const firstInningsBowler = match.innings1?.bowlingTeam || bowlingTeamId;
+
+          if (nextInnings % 2 === 1) {
+            newBattingTeam = firstInningsBatter;
+            newBowlingTeam = firstInningsBowler;
+          } else {
+            newBattingTeam = firstInningsBowler;
+            newBowlingTeam = firstInningsBatter;
+          }
+        } else {
+          newBattingTeam = bowlingTeamId;
+          newBowlingTeam = battingTeamId;
+        }
+
         const newBattingTactics =
           newBattingTeam === match.homeTeam
             ? match.homeTactics || getAITactics(match.homeTeam)
@@ -659,7 +871,7 @@ export const MatchLiveScreen = () => {
 
         setInningsState({
           battingTeam: newBattingTeam,
-          bowlingTeam: battingTeamId,
+          bowlingTeam: newBowlingTeam,
           runs: 0,
           wickets: 0,
           overs: 0,
@@ -672,9 +884,10 @@ export const MatchLiveScreen = () => {
           bowlerStats: new Map(),
         });
 
+        const inningsKey = `innings${currentInnings}` as 'innings1' | 'innings2' | 'innings3' | 'innings4';
         updateMatch(match.id, {
-          currentInnings: 2,
-          innings1: updatedInnings,
+          currentInnings: nextInnings,
+          [inningsKey]: updatedInnings,
         });
       } else {
         // Match ended - handle like simulateNextOver does
@@ -683,7 +896,7 @@ export const MatchLiveScreen = () => {
     }
 
     return { newBatsmanNeeded, inningsComplete };
-  }, [match, inningsState, currentInnings, firstInningsTotal, matchEnded, showNewBatsmanModal, homePlayers, awayPlayers, selectedNextBowler, playerTeamId]);
+  }, [match, inningsState, currentInnings, firstInningsTotal, matchEnded, showNewBatsmanModal, homePlayers, awayPlayers, selectedNextBowler, playerTeamId, inningsTotals]);
 
   // Sim to next wicket
   const simToNextWicket = useCallback(() => {
@@ -701,30 +914,64 @@ export const MatchLiveScreen = () => {
     setIsSimulating(false);
     clearLiveMatchState(); // Clear persisted state
 
-    const team1 = teams.find((t) => t.id === match.innings1?.battingTeam);
-    const team2 = teams.find((t) => t.id === updatedInnings.battingTeam);
+    const isTestFormat = match.format === 'test';
 
-    let winnerTeam: typeof team1 | typeof team2;
+    // Update final innings totals for Test
+    const finalInningsTotals = [...inningsTotals] as [number, number, number, number];
+    finalInningsTotals[currentInnings - 1] = updatedInnings.runs;
+
+    let winnerTeam: typeof teams[0] | undefined;
     let margin: string;
 
-    if (updatedInnings.runs >= firstInningsTotal + 1) {
-      winnerTeam = team2;
-      margin = `${10 - updatedInnings.wickets} wickets`;
-    } else if (updatedInnings.runs < firstInningsTotal) {
-      winnerTeam = team1;
-      margin = `${firstInningsTotal - updatedInnings.runs} runs`;
+    if (isTestFormat) {
+      // Test cricket: compare total runs across both innings for each team
+      const teamAId = match.innings1?.battingTeam;
+      const teamBId = match.innings1?.bowlingTeam;
+      const teamA = teams.find((t) => t.id === teamAId);
+      const teamB = teams.find((t) => t.id === teamBId);
+
+      const teamATotal = finalInningsTotals[0] + finalInningsTotals[2];
+      const teamBTotal = finalInningsTotals[1] + updatedInnings.runs;
+
+      if (teamBTotal > teamATotal) {
+        winnerTeam = teamB;
+        margin = `${10 - updatedInnings.wickets} wickets`;
+      } else if (teamATotal > teamBTotal) {
+        winnerTeam = teamA;
+        margin = `${teamATotal - teamBTotal} runs`;
+      } else {
+        winnerTeam = undefined;
+        margin = 'Match Drawn';
+      }
     } else {
-      winnerTeam = undefined;
-      margin = 'Tie';
+      // T20/ODI logic
+      const team1 = teams.find((t) => t.id === match.innings1?.battingTeam);
+      const team2 = teams.find((t) => t.id === updatedInnings.battingTeam);
+
+      if (updatedInnings.runs >= firstInningsTotal + 1) {
+        winnerTeam = team2;
+        margin = `${10 - updatedInnings.wickets} wickets`;
+      } else if (updatedInnings.runs < firstInningsTotal) {
+        winnerTeam = team1;
+        margin = `${firstInningsTotal - updatedInnings.runs} runs`;
+      } else {
+        winnerTeam = undefined;
+        margin = 'Tie';
+      }
     }
 
+    // Get winner display name for international mode
+    const winnerDisplayName = isInternationalMode
+      ? (winnerTeam?.id === match.homeTeam ? homeTeamName : awayTeamName)
+      : winnerTeam?.name;
+
     setResult({
-      winner: winnerTeam?.name || 'Tie',
-      margin: winnerTeam ? margin : 'Match Tied',
+      winner: winnerDisplayName || (isTestFormat ? 'Draw' : 'Tie'),
+      margin: winnerTeam ? margin : (isTestFormat ? 'Match Drawn' : 'Match Tied'),
     });
 
-    // Update points table for league matches only
-    if (match.matchType === 'league') {
+    // Update points table for league matches only (not for Test internationals)
+    if (match.matchType === 'league' && !isTestFormat) {
       const newPointsTable = [...pointsTable];
       const firstInningsData = match.innings1;
       const team1Id = firstInningsData?.battingTeam || inningsState?.bowlingTeam;
@@ -769,14 +1016,16 @@ export const MatchLiveScreen = () => {
       updatePointsTable(newPointsTable);
     }
 
+    // Save the final innings
+    const finalInningsKey = `innings${currentInnings}` as 'innings1' | 'innings2' | 'innings3' | 'innings4';
     updateMatch(match.id, {
       status: 'completed',
-      innings2: updatedInnings,
+      [finalInningsKey]: updatedInnings,
     });
 
     // Update player fatigue/form (same logic as simulateNextOver)
     updatePlayerStats(updatedInnings);
-  }, [match, firstInningsTotal, pointsTable, teams, inningsState]);
+  }, [match, firstInningsTotal, pointsTable, teams, inningsState, isInternationalMode, homeTeamName, awayTeamName, currentInnings, inningsTotals]);
 
   // Update player stats after match
   const updatePlayerStats = useCallback((updatedInnings: InningsState) => {
@@ -888,12 +1137,21 @@ export const MatchLiveScreen = () => {
     ? teams.find((t) => t.id === inningsState.bowlingTeam)
     : null;
 
-  // Get current batters
+  // Display names for batting/bowling teams in international mode
+  const battingTeamDisplayName = isInternationalMode
+    ? (inningsState?.battingTeam === match?.homeTeam ? homeTeamName : awayTeamName)
+    : battingTeam?.name;
+  const bowlingTeamDisplayName = isInternationalMode
+    ? (inningsState?.bowlingTeam === match?.homeTeam ? homeTeamName : awayTeamName)
+    : bowlingTeam?.name;
+
+  // Get current batters (exclude dismissed batters - defensive check)
+  const dismissedPlayerIds = inningsState?.fallOfWickets.map(f => f.player) || [];
   const striker = inningsState
-    ? players.find((p) => p.id === inningsState.currentBatters[0])
+    ? players.find((p) => p.id === inningsState.currentBatters[0] && !dismissedPlayerIds.includes(p.id))
     : null;
   const nonStriker = inningsState
-    ? players.find((p) => p.id === inningsState.currentBatters[1])
+    ? players.find((p) => p.id === inningsState.currentBatters[1] && !dismissedPlayerIds.includes(p.id))
     : null;
 
   return (
@@ -904,11 +1162,13 @@ export const MatchLiveScreen = () => {
           <div className="flex items-center gap-2">
             <span className="animate-pulse bg-red-600 text-xs px-2 py-1 rounded">LIVE</span>
             <span className="text-sm text-gray-400">
-              {homeTeam.shortName} vs {awayTeam.shortName}
+              {homeTeamShortName} vs {awayTeamShortName}
             </span>
           </div>
           <span className="text-sm text-gray-400">
-            {currentInnings === 1 ? '1st Innings' : '2nd Innings'}
+            {currentInnings === 1 ? '1st Innings' :
+             currentInnings === 2 ? '2nd Innings' :
+             currentInnings === 3 ? '3rd Innings' : '4th Innings'}
           </span>
         </div>
       </header>
@@ -917,7 +1177,7 @@ export const MatchLiveScreen = () => {
         {/* Score Card */}
         <div className="bg-gray-800 rounded-xl p-4 border border-gray-700 text-center">
           <h2 className="text-lg text-gray-400 mb-2">
-            {battingTeam?.name || 'Team'} Batting
+            {battingTeamDisplayName || 'Team'} Batting
           </h2>
 
           <div className="text-5xl font-bold mb-2">
@@ -929,24 +1189,84 @@ export const MatchLiveScreen = () => {
             {((inningsState?.balls || 0) % 6)} overs
           </div>
 
-          {currentInnings === 2 && (
-            <div className="text-lg">
-              {inningsState && inningsState.runs >= firstInningsTotal + 1 ? (
-                <span className="text-green-400">Target reached!</span>
-              ) : (
-                <span className="text-blue-400">
-                  Need {firstInningsTotal + 1 - (inningsState?.runs || 0)} runs from{' '}
-                  {120 - (Math.floor(inningsState?.overs || 0) * 6 + (inningsState?.balls || 0))} balls
-                </span>
-              )}
-            </div>
-          )}
+          {/* Chase display for T20/ODI 2nd innings or Test 4th innings */}
+          {(() => {
+            const isTestFormat = match.format === 'test';
+            const isChaseInnings = (!isTestFormat && currentInnings === 2) ||
+                                   (isTestFormat && currentInnings === 4);
 
-          {currentInnings === 2 && (
-            <div className="mt-2 text-sm text-gray-500">
-              Target: {firstInningsTotal + 1}
-            </div>
-          )}
+            if (!isChaseInnings) return null;
+
+            // Calculate target
+            let target: number;
+            if (isTestFormat) {
+              // Test 4th innings: Team A (innings 1+3) - Team B innings 2 + 1
+              target = (inningsTotals[0] + inningsTotals[2]) - inningsTotals[1] + 1;
+            } else {
+              target = firstInningsTotal + 1;
+            }
+
+            const runsNeeded = target - (inningsState?.runs || 0);
+            const targetReached = (inningsState?.runs || 0) >= target;
+
+            return (
+              <>
+                <div className="text-lg">
+                  {targetReached ? (
+                    <span className="text-green-400">Target reached!</span>
+                  ) : isTestFormat ? (
+                    <span className="text-blue-400">
+                      Need {runsNeeded} runs to win
+                    </span>
+                  ) : (
+                    <span className="text-blue-400">
+                      Need {runsNeeded} runs from{' '}
+                      {getFormatConfig(match.format || 't20').totalOvers * 6 - (Math.floor(inningsState?.overs || 0) * 6 + (inningsState?.balls || 0))} balls
+                    </span>
+                  )}
+                </div>
+                <div className="mt-2 text-sm text-gray-500">
+                  Target: {target}
+                </div>
+              </>
+            );
+          })()}
+
+          {/* Test match status (lead/trail) for innings 1-3 */}
+          {match.format === 'test' && currentInnings < 4 && currentInnings > 1 && (() => {
+            // Calculate current team's position
+            const currentRuns = inningsState?.runs || 0;
+            const currentTeamId = inningsState?.battingTeam;
+
+            // Team A batted in innings 1 & 3, Team B in innings 2 & 4
+            const teamAId = match.innings1?.battingTeam;
+            const teamBId = match.innings1?.bowlingTeam;
+            const isCurrentTeamA = currentTeamId === teamAId;
+
+            let teamATotal = inningsTotals[0];
+            let teamBTotal = inningsTotals[1];
+
+            // Add current innings to the appropriate team
+            if (currentInnings === 2) {
+              teamBTotal = currentRuns;
+            } else if (currentInnings === 3) {
+              teamATotal = inningsTotals[0] + currentRuns;
+            }
+
+            const diff = isCurrentTeamA ? teamATotal - teamBTotal : teamBTotal - teamATotal;
+
+            return (
+              <div className="mt-2 text-sm">
+                {diff > 0 ? (
+                  <span className="text-green-400">Lead by {diff} runs</span>
+                ) : diff < 0 ? (
+                  <span className="text-yellow-400">Trail by {Math.abs(diff)} runs</span>
+                ) : (
+                  <span className="text-gray-400">Scores level</span>
+                )}
+              </div>
+            );
+          })()}
         </div>
 
         {/* Current Batters */}

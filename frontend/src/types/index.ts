@@ -1,4 +1,62 @@
 // ============================================
+// GAME MODE TYPES
+// ============================================
+
+export type GameMode = 'franchise' | 'international';
+
+export type League = 'ipl' | 'bbl' | 'cpl' | 'psl' | 't20_blast';
+
+export type Country =
+  | 'IND' | 'AUS' | 'ENG' | 'PAK' | 'WI' | 'SA'
+  | 'NZ' | 'SL' | 'BAN' | 'ZIM' | 'AFG' | 'IRE';
+
+export type MatchFormat = 't20' | 'odi' | 'test';
+
+// International calendar types
+export type SeriesVenue = 'home' | 'away' | 'neutral';
+
+export interface InternationalSeries {
+  id: string;
+  name: string;
+  opponent: Country;
+  venue: SeriesVenue;
+  format: MatchFormat;
+  matches: number;
+  startMonth: number;
+  year: number;
+  trophy?: string;
+  status: 'upcoming' | 'ongoing' | 'completed';
+  results?: { wins: number; losses: number; draws: number };
+}
+
+export interface TournamentStage {
+  name: string;  // "Group Stage", "Super 8", "Semi-Finals", "Final"
+  matches: number;  // Approximate matches for the player's team
+}
+
+export interface ICCEvent {
+  id: string;
+  name: string;
+  format: MatchFormat;
+  year: number;
+  month: number;
+  hostCountries: Country[];
+  participatingTeams: number;
+  stages: TournamentStage[];
+  status: 'upcoming' | 'ongoing' | 'completed';
+  playerTeamStage?: string;  // Current stage reached
+  playerTeamEliminated?: boolean;
+}
+
+export interface InternationalCalendar {
+  year: number;
+  series: InternationalSeries[];
+  iccEvents: ICCEvent[];
+  currentSeriesId?: string;  // Active series
+  currentEventId?: string;   // Active ICC event
+}
+
+// ============================================
 // PLAYER TYPES
 // ============================================
 
@@ -269,10 +327,12 @@ export interface SerializedInningsState {
 // Live match state for persistence
 export interface LiveMatchState {
   matchId: string;
-  currentInnings: 1 | 2;
+  currentInnings: 1 | 2 | 3 | 4;
   inningsState: SerializedInningsState;
   firstInningsTotal: number;
   recentBalls: BallEvent[];
+  // Test cricket innings totals
+  inningsTotals?: [number, number, number, number];  // All 4 innings totals
 }
 
 export type MatchType = 'league' | 'qualifier1' | 'eliminator' | 'qualifier2' | 'final';
@@ -284,6 +344,7 @@ export interface Match {
   venue: string;
   matchNumber: number;    // In the season
   matchType: MatchType;   // League or playoff match
+  format?: MatchFormat;   // t20/odi/test - defaults to t20 for franchise mode
 
   pitch: PitchConditions;
   weather: 'clear' | 'cloudy' | 'humid';
@@ -296,9 +357,11 @@ export interface Match {
   status: 'upcoming' | 'in_progress' | 'completed';
   tossWinner: string | null;
   tossDecision: 'bat' | 'bowl' | null;
-  currentInnings: 1 | 2 | null;
+  currentInnings: 1 | 2 | 3 | 4 | null;
   innings1: InningsState | null;
   innings2: InningsState | null;
+  innings3?: InningsState | null;  // Test cricket only
+  innings4?: InningsState | null;  // Test cricket only
 
   // Final result
   result: MatchResult | null;
@@ -413,9 +476,33 @@ export interface PointsTableEntry {
   netRunRate: number;
 }
 
+export interface ManagerReputation {
+  domestic: number;        // 0-100: Reputation in franchise cricket
+  international: number;   // 0-100: Reputation in international cricket (unlocks after national job)
+}
+
+export interface TrophyRecord {
+  name: string;           // e.g., "IPL 2025", "Border-Gavaskar Trophy 2026"
+  year: number;
+  type: 'league' | 'icc' | 'bilateral';
+  format: MatchFormat;
+}
+
+export interface ManagerHistory {
+  seasonsManaged: number;
+  titlesWon: number;
+  playoffAppearances: number;
+  trophies: TrophyRecord[];
+  // International-specific
+  testSeriesWon: number;
+  odiSeriesWon: number;
+  t20SeriesWon: number;
+  iccEventsWon: number;
+}
+
 export interface Manager {
   name: string;
-  reputation: number;     // 0-100
+  reputation: ManagerReputation;
 
   // Built through decisions
   identity: {
@@ -425,18 +512,46 @@ export interface Manager {
   };
 
   // Track record
-  history: {
-    seasonsManaged: number;
-    titlesWon: number;
-    playoffAppearances: number;
-  };
+  history: ManagerHistory;
+
+  // Career progression
+  hasNationalTeamJob: boolean;      // True if managing a national team
+  nationalTeamCountry?: Country;    // Which country (if has national job)
+  nationalTeamSince?: number;       // Season when national job started
 }
+
+// National team offer (shown after successful franchise seasons)
+export interface NationalTeamOffer {
+  country: Country;
+  salary: number;         // In lakhs per year
+  prestige: number;       // 0-100: How prestigious is this job
+  reason: string;         // Why they're offering
+  expiresAfterDays: number;  // Offer expires if not accepted
+}
+
+// Career milestone achievements
+export type CareerMilestone =
+  | 'first_win'
+  | 'first_trophy'
+  | 'playoff_streak'      // 3+ consecutive playoffs
+  | 'unbeaten_season'     // No losses in league stage
+  | 'national_team_offer'
+  | 'icc_trophy'
+  | 'test_series_abroad'  // Won Test series away from home
+  | 'grand_slam';         // Won all formats in a year
 
 export interface GameState {
   // Meta
   initialized: boolean;
   testerId: string;          // Unique ID for beta feedback tracking (e.g., "BETA-7K3X")
   startMode: GameStartMode;  // How the game was started
+
+  // Game Mode
+  gameMode: GameMode;        // 'franchise' or 'international'
+  league?: League;           // Set in franchise mode (e.g., 'ipl', 'bbl')
+  country?: Country;         // Set in international mode (e.g., 'IND', 'AUS')
+  currentFormat?: MatchFormat;  // Current match format ('t20', 'odi', 'test')
+  internationalCalendar?: InternationalCalendar;  // Set in international mode
 
   // Time
   currentDate: string;    // ISO date string
@@ -464,6 +579,10 @@ export interface GameState {
   // Season Progression
   releasedPlayers: string[];  // Player IDs released for upcoming auction
   unsoldPlayers: string[];    // Player IDs unsold from previous auctions
+
+  // Career Progression
+  pendingNationalTeamOffer?: NationalTeamOffer;  // Offer waiting for response
+  careerMilestones: CareerMilestone[];           // Achieved milestones
 }
 
 // ============================================

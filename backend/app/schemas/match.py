@@ -155,6 +155,9 @@ class SimulateBallRequest(BaseModel):
     target: Optional[int] = None  # null for first innings
     match_phase: MatchPhase
 
+    # Format (t20, odi, test)
+    match_format: str = "t20"
+
     # Options
     include_narrative: bool = True
 
@@ -199,6 +202,7 @@ class SimulateOverRequest(BaseModel):
     bowling_tactics: BowlingTactics
     pitch_conditions: PitchConditions
     target: Optional[int] = None
+    match_format: str = "t20"  # t20, odi, test
 
 
 class SimulateOverResponse(BaseModel):

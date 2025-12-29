@@ -14,33 +14,112 @@ import {
   BowlingLength,
   FieldSetting,
   BowlingApproach,
+  MatchFormat,
 } from '../types';
+
+// ============================================
+// FORMAT CONFIGURATION
+// ============================================
+
+export interface FormatConfig {
+  totalOvers: number;
+  maxOversPerBowler: number;
+  innings: number;
+}
+
+export const FORMAT_CONFIGS: Record<MatchFormat, FormatConfig> = {
+  t20: { totalOvers: 20, maxOversPerBowler: 4, innings: 2 },
+  odi: { totalOvers: 50, maxOversPerBowler: 10, innings: 2 },
+  // Test: 150 overs per innings max (or all out), unlimited per bowler
+  // In real Tests there's no overs limit, but we use 150 as a practical maximum
+  test: { totalOvers: 150, maxOversPerBowler: 150, innings: 4 },
+};
+
+export const getFormatConfig = (format: MatchFormat = 't20'): FormatConfig => {
+  return FORMAT_CONFIGS[format];
+};
+
+// Helper to derive format from totalOvers
+const getFormatFromOvers = (totalOvers: number): MatchFormat => {
+  if (totalOvers <= 20) return 't20';
+  if (totalOvers <= 50) return 'odi';
+  return 'test';
+};
 
 // ============================================
 // CONSTANTS
 // ============================================
 
-const TOTAL_OVERS = 20;
+// Default to T20 for backwards compatibility
+const DEFAULT_TOTAL_OVERS = 20;
 const BALLS_PER_OVER = 6;
-const MAX_OVERS_PER_BOWLER = 4; // T20 rule: overs / 5 = max per bowler
+const DEFAULT_MAX_OVERS_PER_BOWLER = 4; // T20 rule: overs / 5 = max per bowler
 
-// Base outcome probabilities - calibrated from IPL data (278K balls, 2009-2025)
-// Wicket at 5.1% = ~6 wickets per innings (realistic T20)
-const BASE_OUTCOMES = {
-  dot: 0.326,
-  single: 0.382,
-  two: 0.065,
-  three: 0.003,
-  four: 0.119,
-  six: 0.053,
-  wicket: 0.051,
+// Backwards compatible alias - functions should use totalOvers parameter when available
+const TOTAL_OVERS = DEFAULT_TOTAL_OVERS;
+const MAX_OVERS_PER_BOWLER = DEFAULT_MAX_OVERS_PER_BOWLER;
+
+// Base outcome probabilities by format
+// T20: calibrated from IPL data (278K balls, 2009-2025) - ~8 RPO
+// ODI: estimated from international ODI averages - ~5.5 RPO
+// Test: calibrated from Cricsheet data (888 Tests, 1.7M balls) - ~3.2 RPO
+const BASE_OUTCOMES_BY_FORMAT: Record<MatchFormat, {
+  dot: number; single: number; two: number; three: number; four: number; six: number; wicket: number;
+}> = {
+  t20: {
+    dot: 0.326,
+    single: 0.382,
+    two: 0.065,
+    three: 0.003,
+    four: 0.119,
+    six: 0.053,
+    wicket: 0.051,  // ~6 wickets per 20 overs
+  },
+  odi: {
+    dot: 0.380,     // More defensive
+    single: 0.350,
+    two: 0.070,
+    three: 0.005,
+    four: 0.100,    // Fewer boundaries
+    six: 0.035,
+    wicket: 0.060,  // ~6 wickets per 50 overs (lower per-ball rate)
+  },
+  // Test: Calibrated from 888 Test matches (1.7M deliveries) - Cricsheet data
+  test: {
+    dot: 0.720,     // 72% dot balls - survival focused
+    single: 0.146,
+    two: 0.036,
+    three: 0.009,
+    four: 0.060,    // 6% fours
+    six: 0.004,     // Sixes are very rare in Tests (0.4%)
+    wicket: 0.017,  // ~10 wickets per 600 balls (100 overs)
+  },
 };
 
-// Phase modifiers - calibrated from IPL data
-const PHASE_MODIFIERS: Record<MatchPhase, { boundaryMod: number; wicketMod: number; runRate: number }> = {
+// Default to T20 for backwards compatibility
+const BASE_OUTCOMES = BASE_OUTCOMES_BY_FORMAT.t20;
+
+// Phase modifiers - T20 calibrated from IPL data
+const PHASE_MODIFIERS_T20: Record<MatchPhase, { boundaryMod: number; wicketMod: number; runRate: number }> = {
   powerplay: { boundaryMod: 1.08, wicketMod: 0.76, runRate: 7.5 },  // Batters play safer!
   middle: { boundaryMod: 0.85, wicketMod: 0.89, runRate: 7.8 },
   death: { boundaryMod: 1.23, wicketMod: 1.78, runRate: 9.8 },      // Death overs are brutal
+};
+
+// Phase modifiers - Test cricket (much flatter, slight variation by phase)
+// Based on Cricsheet analysis: opening=3.16 RPO, middle=3.22, late=3.42
+const PHASE_MODIFIERS_TEST: Record<MatchPhase, { boundaryMod: number; wicketMod: number; runRate: number }> = {
+  powerplay: { boundaryMod: 1.02, wicketMod: 0.98, runRate: 3.16 },  // New ball - slight advantage to bowlers
+  middle: { boundaryMod: 0.98, wicketMod: 0.98, runRate: 3.22 },     // Settled period
+  death: { boundaryMod: 1.02, wicketMod: 1.15, runRate: 3.42 },      // Old ball, tired bowlers, pitch wear
+};
+
+// Helper to get format-appropriate phase modifiers
+const getPhaseModifiers = (phase: MatchPhase, format: MatchFormat) => {
+  if (format === 'test') {
+    return PHASE_MODIFIERS_TEST[phase];
+  }
+  return PHASE_MODIFIERS_T20[phase];
 };
 
 // Tactical approach modifiers - less extreme wicket effects
@@ -132,9 +211,9 @@ const BATSMAN_STATE_THRESHOLDS = {
   settling: 15, // Balls 7-15 - gradually opening up
 };
 
-// Batsman state modifiers - calibrated from IPL data
+// Batsman state modifiers - T20 calibrated from IPL data
 // Key insight: new batsmen are actually SAFER (0.90 wicket mod) because they play carefully
-const BATSMAN_STATE_MODIFIERS: Record<BatsmanState, {
+const BATSMAN_STATE_MODIFIERS_T20: Record<BatsmanState, {
   boundaryMod: number;    // Reduced boundaries when new
   wicketMod: number;      // New batsmen are safer, set batsmen take risks
   dotMod: number;         // More dots when new
@@ -158,6 +237,42 @@ const BATSMAN_STATE_MODIFIERS: Record<BatsmanState, {
     dotMod: 0.74,         // Fewer dots
     singleMod: 1.13,      // Better rotation
   },
+};
+
+// Batsman state modifiers - Test cricket (much more conservative)
+// In Tests, even set batsmen maintain defensive play
+const BATSMAN_STATE_MODIFIERS_TEST: Record<BatsmanState, {
+  boundaryMod: number;
+  wicketMod: number;
+  dotMod: number;
+  singleMod: number;
+}> = {
+  'new': {
+    boundaryMod: 0.60,    // Very few boundaries when new
+    wicketMod: 1.10,      // Slightly more vulnerable (adjusting to conditions)
+    dotMod: 1.10,         // Playing themselves in
+    singleMod: 0.85,
+  },
+  'settling': {
+    boundaryMod: 0.90,
+    wicketMod: 1.00,
+    dotMod: 1.02,
+    singleMod: 0.95,
+  },
+  'set': {
+    boundaryMod: 1.05,    // Only slight increase in boundaries
+    wicketMod: 0.95,      // Actually safer when set
+    dotMod: 0.98,         // Still playing lots of dots (Test cricket!)
+    singleMod: 1.05,      // Better rotation
+  },
+};
+
+// Helper to get format-appropriate batsman state modifiers
+const getBatsmanStateModifiers = (state: BatsmanState, format: MatchFormat) => {
+  if (format === 'test') {
+    return BATSMAN_STATE_MODIFIERS_TEST[state];
+  }
+  return BATSMAN_STATE_MODIFIERS_T20[state];
 };
 
 // Pressure and momentum system - DATA-DERIVED from IPL analysis
@@ -315,10 +430,26 @@ const getBatsmanState = (ballsFaced: number): BatsmanState => {
   return 'set';
 };
 
-export const getPhase = (over: number): MatchPhase => {
-  if (over < 6) return 'powerplay';
-  if (over < 16) return 'middle';
-  return 'death';
+export const getPhase = (over: number, totalOvers: number = DEFAULT_TOTAL_OVERS): MatchPhase => {
+  // Phase boundaries scale with format:
+  // T20: PP=6, Middle=10, Death=4 (6/16/20)
+  // ODI: PP=10, Middle=30, Death=10 (10/40/50)
+  // Test: No death overs, just powerplay and middle
+  if (totalOvers <= 20) {
+    // T20 format
+    if (over < 6) return 'powerplay';
+    if (over < 16) return 'middle';
+    return 'death';
+  } else if (totalOvers <= 50) {
+    // ODI format
+    if (over < 10) return 'powerplay';
+    if (over < 40) return 'middle';
+    return 'death';
+  } else {
+    // Test format - no death overs
+    if (over < 10) return 'powerplay';
+    return 'middle';
+  }
 };
 
 // Calculate match context from innings state
@@ -659,10 +790,13 @@ export const simulateBall = (
   // Batsman settling-in: balls faced by this batter
   ballsFaced: number = 0,
   // Pressure/momentum context
-  matchContext?: MatchContext
+  matchContext?: MatchContext,
+  // Format-aware total overs
+  totalOvers: number = DEFAULT_TOTAL_OVERS
 ): { outcome: BallOutcome; narrative: string } => {
-  const phase = getPhase(over);
-  const phaseMod = PHASE_MODIFIERS[phase];
+  const phase = getPhase(over, totalOvers);
+  const format = getFormatFromOvers(totalOvers);
+  const phaseMod = getPhaseModifiers(phase, format);
 
   // Get tactical approach for current phase
   const approach = tactics.battingApproach[phase];
@@ -693,12 +827,15 @@ export const simulateBall = (
   const batterFatigue = applyFatigueModifier(1, batter.fatigue);
   const bowlerFatigue = applyFatigueModifier(1, bowler.fatigue);
 
-  // Batsman settling-in state
+  // Get format-specific base probabilities (format already computed above)
+  const baseOutcomes = BASE_OUTCOMES_BY_FORMAT[format];
+
+  // Batsman settling-in state (format-aware)
   const batsmanState = getBatsmanState(ballsFaced);
-  const batsmanStateMod = BATSMAN_STATE_MODIFIERS[batsmanState];
+  const batsmanStateMod = getBatsmanStateModifiers(batsmanState, format);
 
   // Calculate modified probabilities
-  let probs = { ...BASE_OUTCOMES };
+  let probs = { ...baseOutcomes };
 
   // Skill affects all outcomes
   const skillModifier = 1 + skillDiff * 0.15;
@@ -742,7 +879,7 @@ export const simulateBall = (
 
   // Pressure situation (chasing in death overs with high required rate)
   if (target !== null) {
-    const ballsRemaining = (TOTAL_OVERS - over) * 6;
+    const ballsRemaining = (totalOvers - over) * 6;
     const runsNeeded = target - currentRuns;
     const requiredRate = (runsNeeded / ballsRemaining) * 6;
 
@@ -823,7 +960,8 @@ export const simulateSingleBall = (
   inningsState: InningsState,
   tactics: MatchTactics,
   pitch: PitchConditions,
-  target: number | null
+  target: number | null,
+  totalOvers: number = DEFAULT_TOTAL_OVERS
 ): { ballEvent: BallEvent; updatedInnings: InningsState; newBatsmanNeeded: boolean; inningsComplete: boolean } => {
   const overNumber = inningsState.overs;
   const ballNumber = inningsState.balls;
@@ -928,7 +1066,7 @@ export const simulateSingleBall = (
   // Check if innings complete
   const inningsComplete =
     newWickets >= 10 ||
-    newOvers >= TOTAL_OVERS ||
+    newOvers >= totalOvers ||
     (target !== null && newRuns >= target);
 
   // Create updated innings state
@@ -1004,7 +1142,9 @@ export const simulateOver = (
   inningsState: InningsState,
   tactics: MatchTactics,
   pitch: PitchConditions,
-  target: number | null
+  target: number | null,
+  totalOvers: number = DEFAULT_TOTAL_OVERS,
+  maxOversPerBowler: number = DEFAULT_MAX_OVERS_PER_BOWLER
 ): { overSummary: OverSummary; updatedInnings: InningsState } => {
   const overNumber = Math.floor(inningsState.overs);
   const balls: BallEvent[] = [];
@@ -1228,7 +1368,9 @@ export const simulateInnings = (
   bowlingTeamPlayers: Player[],
   tactics: MatchTactics,
   pitch: PitchConditions,
-  target: number | null = null
+  target: number | null = null,
+  totalOvers: number = DEFAULT_TOTAL_OVERS,
+  maxOversPerBowler: number = DEFAULT_MAX_OVERS_PER_BOWLER
 ): InningsState => {
   // Get players in batting order
   const battingOrder = tactics.playingXI
@@ -1261,23 +1403,25 @@ export const simulateInnings = (
 
   let lastBowlerId: string | null = null;
 
-  for (let over = 0; over < TOTAL_OVERS; over++) {
+  for (let over = 0; over < totalOvers; over++) {
     // Get available bowlers (haven't maxed out and didn't bowl last over)
     const availableBowlers = bowlers.filter(b => {
       const oversBowled = bowlerOversCount.get(b.id) || 0;
-      return oversBowled < MAX_OVERS_PER_BOWLER && b.id !== lastBowlerId;
+      return oversBowled < maxOversPerBowler && b.id !== lastBowlerId;
     });
 
     if (availableBowlers.length === 0) {
       // If no bowlers available (shouldn't happen with proper squad), allow last bowler
-      const stillAvailable = bowlers.filter(b => (bowlerOversCount.get(b.id) || 0) < MAX_OVERS_PER_BOWLER);
+      const stillAvailable = bowlers.filter(b => (bowlerOversCount.get(b.id) || 0) < maxOversPerBowler);
       if (stillAvailable.length === 0) break; // All bowlers maxed out
       availableBowlers.push(stillAvailable[0]);
     }
 
     // Select bowler - prefer death specialist in death overs
+    // Death overs start at 80% of innings (T20: 16, ODI: 40)
+    const deathOversStart = Math.floor(totalOvers * 0.8);
     let bowler = availableBowlers[0];
-    if (over >= 16 && tactics.bowlingPlan.deathBowler) {
+    if (over >= deathOversStart && tactics.bowlingPlan.deathBowler) {
       const deathBowler = availableBowlers.find((b) => b.id === tactics.bowlingPlan.deathBowler);
       if (deathBowler) {
         bowler = deathBowler;
@@ -1297,7 +1441,9 @@ export const simulateInnings = (
       inningsState,
       tactics,
       pitch,
-      target
+      target,
+      totalOvers,
+      maxOversPerBowler
     );
 
     inningsState = updatedInnings;

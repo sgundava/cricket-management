@@ -2,6 +2,7 @@
 Core Match Engine for Cricket Simulation.
 
 Handles ball-by-ball and over-by-over simulation using the probability model.
+Supports multiple formats: T20, ODI, and Test cricket.
 """
 
 import random
@@ -13,6 +14,10 @@ from app.schemas.common import (
     BowlingLength,
     FieldSetting,
     DismissalType,
+    MatchFormat,
+    MatchFormatConfig,
+    get_format_config,
+    MATCH_FORMATS,
 )
 from app.schemas.player import PlayerStats, BatterStats, BowlerStats
 from app.schemas.match import (
@@ -40,23 +45,40 @@ class MatchEngine:
 
     Uses probability model for outcome calculation and provides
     ball-by-ball and over-by-over simulation methods.
+    Supports T20, ODI, and Test formats.
     """
 
-    TOTAL_OVERS = 20
-    BALLS_PER_OVER = 6
-    MAX_WICKETS = 10
+    def __init__(
+        self,
+        probability_model: Optional[ProbabilityModel] = None,
+        format_config: Optional[MatchFormatConfig] = None,
+    ):
+        # Use provided format config or default to T20
+        self.format_config = format_config or get_format_config("t20")
 
-    def __init__(self, probability_model: Optional[ProbabilityModel] = None):
+        # Set format-specific constants from config
+        self.TOTAL_OVERS = self.format_config.overs_per_innings
+        self.BALLS_PER_OVER = self.format_config.balls_per_over
+        self.MAX_WICKETS = self.format_config.max_wickets
+
+        # Initialize probability model (with format-specific params if needed)
         self.probability_model = probability_model or ProbabilityModel()
         self.narrative_generator = NarrativeGenerator()
 
     def get_phase(self, overs: float) -> MatchPhase:
-        """Determine match phase based on overs."""
-        if overs < 6:
-            return MatchPhase.POWERPLAY
-        if overs < 16:
-            return MatchPhase.MIDDLE
-        return MatchPhase.DEATH
+        """Determine match phase based on overs and format."""
+        for phase_name, (start, end) in self.format_config.phases.items():
+            if start <= overs < end:
+                # Map phase names to MatchPhase enum
+                phase_mapping = {
+                    "powerplay": MatchPhase.POWERPLAY,
+                    "middle": MatchPhase.MIDDLE,
+                    "death": MatchPhase.DEATH,
+                    "new_ball": MatchPhase.POWERPLAY,  # Map Test phases to existing enums
+                    "old_ball": MatchPhase.DEATH,
+                }
+                return phase_mapping.get(phase_name, MatchPhase.MIDDLE)
+        return MatchPhase.MIDDLE
 
     def _calculate_recent_ball_stats(
         self,

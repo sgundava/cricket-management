@@ -25,6 +25,14 @@ import {
   SaveSlot,
   LiveMatchState,
   SerializedInningsState,
+  GameMode,
+  League,
+  Country,
+  InternationalCalendar,
+  MatchFormat,
+  NationalTeamOffer,
+  CareerMilestone,
+  TrophyRecord,
 } from '../types';
 import {
   getSaveSlots,
@@ -69,7 +77,15 @@ import { AUCTION_CONFIG } from '../config/gameConfig';
 
 interface GameStore extends GameState, UIState {
   // Initialization
-  initializeGame: (playerTeamId: string, managerName: string, startMode: GameStartMode) => void;
+  initializeGame: (
+    playerTeamId: string,
+    managerName: string,
+    startMode: GameStartMode,
+    gameMode?: GameMode,
+    league?: League,
+    country?: Country,
+    internationalCalendar?: InternationalCalendar
+  ) => void;
   resetGame: () => void;
 
   // Navigation
@@ -114,6 +130,14 @@ interface GameStore extends GameState, UIState {
   resetForNewSeason: () => void;
   isMegaAuctionYear: (season: number) => boolean;
 
+  // Career Progression
+  checkNationalTeamOffer: () => NationalTeamOffer | null;
+  acceptNationalTeamOffer: () => void;
+  declineNationalTeamOffer: () => void;
+  updateManagerReputation: (change: number, type: 'domestic' | 'international') => void;
+  addTrophy: (trophy: TrophyRecord) => void;
+  addCareerMilestone: (milestone: CareerMilestone) => void;
+
   // Event management
   addEvent: (event: GameEvent) => void;
   resolveEvent: (eventId: string, optionId: string) => void;
@@ -126,6 +150,9 @@ interface GameStore extends GameState, UIState {
 
   // Data loading
   loadInitialData: (players: Player[], teams: Team[], fixtures: Match[]) => void;
+
+  // International mode
+  startInternationalMatch: (seriesId: string, matchNumber: number) => void;
 
   // Player Interactions
   canTalkToPlayer: (playerId: string) => boolean;
@@ -205,13 +232,23 @@ const initialGameState: GameState = {
   initialized: false,
   testerId: '',
   startMode: 'real-squads',
+
+  // Game Mode (default to franchise/ipl for backwards compatibility)
+  gameMode: 'franchise',
+  league: 'ipl',
+  country: undefined,
+  currentFormat: 't20',
+
   currentDate: new Date().toISOString().split('T')[0],
   season: 1,
   phase: 'season',
   matchDay: 1,
   manager: {
     name: '',
-    reputation: 50,
+    reputation: {
+      domestic: 50,
+      international: 0,
+    },
     identity: {
       tacticalStyle: 'balanced',
       youthFocus: 50,
@@ -221,7 +258,13 @@ const initialGameState: GameState = {
       seasonsManaged: 0,
       titlesWon: 0,
       playoffAppearances: 0,
+      trophies: [],
+      testSeriesWon: 0,
+      odiSeriesWon: 0,
+      t20SeriesWon: 0,
+      iccEventsWon: 0,
     },
+    hasNationalTeamJob: false,
   },
   playerTeamId: '',
   teams: [],
@@ -233,6 +276,8 @@ const initialGameState: GameState = {
   lastMeetingMatchDay: 0,
   releasedPlayers: [],
   unsoldPlayers: [],
+  pendingNationalTeamOffer: undefined,
+  careerMilestones: [],
 };
 
 const initialUIState: UIState = {
@@ -262,21 +307,40 @@ export const useGameStore = create<GameStore>()(
       // ----------------------------------------
       // Initialization
       // ----------------------------------------
-      initializeGame: (playerTeamId: string, managerName: string, startMode: GameStartMode) => {
+      initializeGame: (
+        playerTeamId: string,
+        managerName: string,
+        startMode: GameStartMode,
+        gameMode: GameMode = 'franchise',
+        league?: League,
+        country?: Country,
+        internationalCalendar?: InternationalCalendar
+      ) => {
         // If starting with auction (mini or mega), go to auction phase first
         // Otherwise, go directly to season
         const initialPhase = startMode === 'real-squads' ? 'season' : 'auction';
+
+        // Determine default format based on mode
+        const currentFormat: MatchFormat = gameMode === 'franchise' ? 't20' : 't20'; // Will be dynamic for international
+
+        // Determine start date based on mode
+        const currentDate = gameMode === 'franchise' ? '2025-03-22' : '2025-01-01'; // IPL vs International year start
 
         set({
           initialized: true,
           testerId: generateTesterId(),
           startMode,
+          gameMode,
+          league: gameMode === 'franchise' ? (league || 'ipl') : undefined,
+          country: gameMode === 'international' ? country : undefined,
+          currentFormat,
+          internationalCalendar: gameMode === 'international' ? internationalCalendar : undefined,
           playerTeamId,
           manager: {
             ...initialGameState.manager,
             name: managerName,
           },
-          currentDate: '2025-03-22', // IPL start date
+          currentDate,
           season: 1,
           phase: initialPhase,
           matchDay: 1,
@@ -996,19 +1060,190 @@ export const useGameStore = create<GameStore>()(
         return season % 3 === 1;
       },
 
+      // ----------------------------------------
+      // Career Progression
+      // ----------------------------------------
+      checkNationalTeamOffer: () => {
+        const { gameMode, manager, league, season } = get();
+
+        // Only in franchise mode
+        if (gameMode !== 'franchise') return null;
+
+        // Already has national team job
+        if (manager.hasNationalTeamJob) return null;
+
+        // Requirements:
+        // - 2+ seasons managed
+        // - Won at least 1 trophy OR 2+ playoff appearances
+        // - Domestic reputation > 70
+        const { history, reputation } = manager;
+
+        const meetsSeasons = history.seasonsManaged >= 2;
+        const meetsPerformance = history.titlesWon >= 1 || history.playoffAppearances >= 2;
+        const meetsReputation = reputation.domestic >= 70;
+
+        if (!meetsSeasons || !meetsPerformance || !meetsReputation) {
+          return null;
+        }
+
+        // Determine which country's national team based on league
+        const leagueToCountry: Record<string, Country> = {
+          ipl: 'IND',
+          bbl: 'AUS',
+          cpl: 'WI',
+          psl: 'PAK',
+          t20_blast: 'ENG',
+        };
+
+        const country = league ? leagueToCountry[league] : 'IND';
+        if (!country) return null;
+
+        // Calculate offer prestige based on country (top teams are more prestigious)
+        const prestigeByCountry: Record<Country, number> = {
+          IND: 95, AUS: 90, ENG: 88, PAK: 75, WI: 70,
+          SA: 80, NZ: 78, SL: 72, BAN: 65, ZIM: 50, AFG: 60, IRE: 55,
+        };
+
+        // Generate reason
+        let reason = '';
+        if (history.titlesWon >= 2) {
+          reason = `Your ${history.titlesWon} title wins have caught our attention.`;
+        } else if (history.titlesWon >= 1) {
+          reason = `Your championship victory proves you can deliver under pressure.`;
+        } else {
+          reason = `Your consistent playoff performances show tactical excellence.`;
+        }
+
+        const offer: NationalTeamOffer = {
+          country,
+          salary: 500 + Math.floor(reputation.domestic * 5), // 500-1000 lakhs
+          prestige: prestigeByCountry[country] || 70,
+          reason,
+          expiresAfterDays: 7,
+        };
+
+        // Set the pending offer
+        set({ pendingNationalTeamOffer: offer });
+
+        return offer;
+      },
+
+      acceptNationalTeamOffer: () => {
+        const { pendingNationalTeamOffer, manager, season, careerMilestones } = get();
+
+        if (!pendingNationalTeamOffer) return;
+
+        // Update manager with national team job
+        set({
+          manager: {
+            ...manager,
+            hasNationalTeamJob: true,
+            nationalTeamCountry: pendingNationalTeamOffer.country,
+            nationalTeamSince: season,
+          },
+          pendingNationalTeamOffer: undefined,
+          careerMilestones: [...careerMilestones, 'national_team_offer'],
+        });
+      },
+
+      declineNationalTeamOffer: () => {
+        set({ pendingNationalTeamOffer: undefined });
+      },
+
+      updateManagerReputation: (change: number, type: 'domestic' | 'international') => {
+        const { manager } = get();
+        const newReputation = { ...manager.reputation };
+
+        if (type === 'domestic') {
+          newReputation.domestic = Math.max(0, Math.min(100, newReputation.domestic + change));
+        } else {
+          newReputation.international = Math.max(0, Math.min(100, newReputation.international + change));
+        }
+
+        set({
+          manager: {
+            ...manager,
+            reputation: newReputation,
+          },
+        });
+      },
+
+      addTrophy: (trophy: TrophyRecord) => {
+        const { manager } = get();
+        const newHistory = { ...manager.history };
+        newHistory.trophies = [...newHistory.trophies, trophy];
+        newHistory.titlesWon += 1;
+
+        // Update format-specific counts
+        if (trophy.type === 'bilateral') {
+          switch (trophy.format) {
+            case 'test':
+              newHistory.testSeriesWon += 1;
+              break;
+            case 'odi':
+              newHistory.odiSeriesWon += 1;
+              break;
+            case 't20':
+              newHistory.t20SeriesWon += 1;
+              break;
+          }
+        } else if (trophy.type === 'icc') {
+          newHistory.iccEventsWon += 1;
+        }
+
+        set({
+          manager: {
+            ...manager,
+            history: newHistory,
+          },
+        });
+      },
+
+      addCareerMilestone: (milestone: CareerMilestone) => {
+        const { careerMilestones } = get();
+        if (!careerMilestones.includes(milestone)) {
+          set({ careerMilestones: [...careerMilestones, milestone] });
+        }
+      },
+
       processSeasonEnd: () => {
-        const { players, teams, playerTeamId, getSeasonResult, manager } = get();
+        const { players, teams, playerTeamId, getSeasonResult, manager, updateManagerReputation, checkNationalTeamOffer, league, season } = get();
         const result = getSeasonResult();
 
         // Update manager history
         const newManagerHistory = { ...manager.history };
         newManagerHistory.seasonsManaged += 1;
+
+        // Calculate reputation change based on performance
+        let reputationChange = 0;
         if (result?.champion === playerTeamId) {
           newManagerHistory.titlesWon += 1;
+          reputationChange += 15; // Won the title
+          // Add trophy to history
+          const trophyName = league ? `${league.toUpperCase()} ${2024 + season}` : `Season ${season} Championship`;
+          newManagerHistory.trophies = [
+            ...newManagerHistory.trophies,
+            { name: trophyName, year: 2024 + season, type: 'league', format: 't20' as const },
+          ];
+        } else if (result?.runnerUp === playerTeamId) {
+          reputationChange += 8; // Runner-up
         }
         if (result && result.playerFinish <= 4) {
           newManagerHistory.playoffAppearances += 1;
+          if (result.playerFinish > 2) {
+            reputationChange += 3; // Made playoffs
+          }
+        } else if (result && result.playerFinish <= 6) {
+          reputationChange -= 2; // Missed playoffs but close
+        } else {
+          reputationChange -= 5; // Poor finish
         }
+
+        // Update reputation
+        const newReputation = {
+          ...manager.reputation,
+          domestic: Math.max(0, Math.min(100, manager.reputation.domestic + reputationChange)),
+        };
 
         // Age all players (+1 year) and decrement contracts (-1 year)
         const updatedPlayers = players.map((player) => ({
@@ -1042,11 +1277,15 @@ export const useGameStore = create<GameStore>()(
           manager: {
             ...manager,
             history: newManagerHistory,
+            reputation: newReputation,
           },
           phase: 'off-season',
           releasedPlayers: expiredContractPlayers,
           unsoldPlayers: [...get().unsoldPlayers, ...freeAgents],
         });
+
+        // Check for national team offer after updating state
+        checkNationalTeamOffer();
       },
 
       startNextSeason: () => {
@@ -2361,6 +2600,71 @@ export const useGameStore = create<GameStore>()(
       },
 
       // ----------------------------------------
+      // International Mode
+      // ----------------------------------------
+      startInternationalMatch: (seriesId: string, matchNumber: number) => {
+        const { internationalCalendar, teams, playerTeamId, fixtures, country } = get();
+
+        if (!internationalCalendar || !country) return;
+
+        // Find the series
+        const series = internationalCalendar.series.find(s => s.id === seriesId);
+        if (!series) return;
+
+        // Use the player's team as "home" (national team)
+        const playerTeam = teams.find(t => t.id === playerTeamId);
+        if (!playerTeam) return;
+
+        // Pick an opponent team (use a different team to represent the opponent)
+        const opponentTeam = teams.find(t => t.id !== playerTeamId);
+        if (!opponentTeam) return;
+
+        // Generate a unique match ID
+        const matchId = `intl-${seriesId}-${matchNumber}`;
+
+        // Check if match already exists
+        const existingMatch = fixtures.find(f => f.id === matchId);
+        if (existingMatch) {
+          // Just select and navigate to it
+          set({ selectedMatchId: matchId });
+          return;
+        }
+
+        // Create the international match
+        const newMatch: Match = {
+          id: matchId,
+          homeTeam: series.venue === 'home' ? playerTeamId : opponentTeam.id,
+          awayTeam: series.venue === 'home' ? opponentTeam.id : playerTeamId,
+          venue: series.venue === 'home' ? 'Narendra Modi Stadium' : 'MCG',
+          matchNumber: fixtures.length + 1,
+          matchType: 'league', // Using league type for international matches for now
+          format: series.format, // Wire the format from series (t20/odi/test)
+          pitch: {
+            pace: series.format === 'test' ? 50 : 40,
+            spin: series.format === 'test' ? 50 : 30,
+            bounce: series.format === 'test' ? 60 : 50,
+            deterioration: series.format === 'test' ? 30 : 10,
+          },
+          weather: 'clear',
+          homeTactics: null,
+          awayTactics: null,
+          status: 'upcoming',
+          tossWinner: null,
+          tossDecision: null,
+          currentInnings: null,
+          innings1: null,
+          innings2: null,
+          result: null,
+        };
+
+        // Add the match to fixtures and select it
+        set({
+          fixtures: [...fixtures, newMatch],
+          selectedMatchId: matchId,
+        });
+      },
+
+      // ----------------------------------------
       // Player Interactions
       // ----------------------------------------
       canTalkToPlayer: (playerId: string) => {
@@ -2596,6 +2900,10 @@ export const useGameStore = create<GameStore>()(
           initialized: state.initialized,
           testerId: state.testerId,
           startMode: state.startMode,
+          gameMode: state.gameMode,
+          league: state.league,
+          country: state.country,
+          currentFormat: state.currentFormat,
           currentDate: state.currentDate,
           season: state.season,
           phase: state.phase,
@@ -2611,6 +2919,8 @@ export const useGameStore = create<GameStore>()(
           lastMeetingMatchDay: state.lastMeetingMatchDay,
           releasedPlayers: state.releasedPlayers,
           unsoldPlayers: state.unsoldPlayers,
+          pendingNationalTeamOffer: state.pendingNationalTeamOffer,
+          careerMilestones: state.careerMilestones,
         };
 
         const saveName = name || `${teamName} - S${state.season} M${state.matchDay}`;
@@ -2672,6 +2982,8 @@ export const useGameStore = create<GameStore>()(
             lastMeetingMatchDay: state.lastMeetingMatchDay,
             releasedPlayers: state.releasedPlayers,
             unsoldPlayers: state.unsoldPlayers,
+            pendingNationalTeamOffer: state.pendingNationalTeamOffer,
+            careerMilestones: state.careerMilestones,
           },
           auctionState: state.auctionState,
           liveMatchState: state.liveMatchState,
@@ -2703,6 +3015,11 @@ export const useGameStore = create<GameStore>()(
         initialized: state.initialized,
         testerId: state.testerId,
         startMode: state.startMode,
+        gameMode: state.gameMode,
+        league: state.league,
+        country: state.country,
+        currentFormat: state.currentFormat,
+        internationalCalendar: state.internationalCalendar,
         currentDate: state.currentDate,
         season: state.season,
         phase: state.phase,
@@ -2718,6 +3035,8 @@ export const useGameStore = create<GameStore>()(
         lastMeetingMatchDay: state.lastMeetingMatchDay,
         releasedPlayers: state.releasedPlayers,
         unsoldPlayers: state.unsoldPlayers,
+        pendingNationalTeamOffer: state.pendingNationalTeamOffer,
+        careerMilestones: state.careerMilestones,
         auctionState: state.auctionState,
         liveMatchState: state.liveMatchState,
       }),

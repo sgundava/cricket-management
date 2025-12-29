@@ -1,4 +1,5 @@
 import { useGameStore } from '../store/gameStore';
+import { COUNTRIES } from '../data/countries';
 
 export const SeasonSummaryScreen = () => {
   const {
@@ -9,10 +10,13 @@ export const SeasonSummaryScreen = () => {
     pointsTable,
     manager,
     season,
+    pendingNationalTeamOffer,
     navigateTo,
     resetGame,
     getSeasonResult,
     startNextSeason,
+    acceptNationalTeamOffer,
+    declineNationalTeamOffer,
   } = useGameStore();
 
   const playerTeam = teams.find((t) => t.id === playerTeamId);
@@ -147,6 +151,61 @@ export const SeasonSummaryScreen = () => {
                 </p>
               </>
             )}
+          </div>
+        )}
+
+        {/* National Team Offer */}
+        {pendingNationalTeamOffer && (
+          <div className="bg-gradient-to-r from-emerald-900/50 to-teal-900/50 rounded-xl p-5 border border-emerald-600 animate-pulse-slow">
+            <div className="text-center mb-4">
+              <div className="text-4xl mb-2">
+                {COUNTRIES[pendingNationalTeamOffer.country]?.flag || '🏏'}
+              </div>
+              <h2 className="text-xl font-bold text-emerald-400">National Team Offer!</h2>
+              <p className="text-sm text-emerald-200 mt-1">
+                {COUNTRIES[pendingNationalTeamOffer.country]?.name || pendingNationalTeamOffer.country} Cricket Board
+              </p>
+            </div>
+
+            <div className="bg-gray-900/50 rounded-lg p-3 mb-4">
+              <p className="text-sm text-gray-300 text-center">
+                {pendingNationalTeamOffer.reason}
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 mb-4 text-center">
+              <div className="bg-gray-800/50 rounded-lg p-2">
+                <div className="text-lg font-bold text-yellow-400">
+                  {pendingNationalTeamOffer.prestige}
+                </div>
+                <div className="text-xs text-gray-400">Prestige</div>
+              </div>
+              <div className="bg-gray-800/50 rounded-lg p-2">
+                <div className="text-lg font-bold text-green-400">
+                  ${(pendingNationalTeamOffer.salary / 100).toFixed(1)}M
+                </div>
+                <div className="text-xs text-gray-400">Annual Salary</div>
+              </div>
+            </div>
+
+            <div className="text-xs text-gray-400 text-center mb-4">
+              You'll manage both your franchise team and the national squad across all formats (T20I, ODI, Test).
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => acceptNationalTeamOffer()}
+                className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white py-3 rounded-lg font-bold transition-colors"
+              >
+                Accept Offer
+              </button>
+              <button
+                onClick={() => declineNationalTeamOffer()}
+                className="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-3 rounded-lg font-medium transition-colors"
+              >
+                Decline
+              </button>
+            </div>
           </div>
         )}
 

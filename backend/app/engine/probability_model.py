@@ -54,14 +54,32 @@ class ProbabilityModel:
     8. Pressure/momentum
     9. Pitch effects
     10. Chase pressure (if applicable)
+
+    Supports multiple formats (T20, ODI, Test) with format-specific params.
     """
 
-    def __init__(self, params_path: Optional[Path] = None):
+    def __init__(self, params_path: Optional[Path] = None, format_name: Optional[str] = None):
+        settings = get_settings()
+
         if params_path is None:
-            params_path = get_settings().probability_params_path
+            # Load format-specific params if format is specified
+            if format_name:
+                config_dir = settings.probability_params_path.parent
+                format_params_file = config_dir / f"probability_params_{format_name.lower()}.yaml"
+                if format_params_file.exists():
+                    params_path = format_params_file
+                else:
+                    # Fall back to default params
+                    params_path = settings.probability_params_path
+            else:
+                params_path = settings.probability_params_path
 
         with open(params_path) as f:
             self.params = yaml.safe_load(f)
+
+        # Store format info for chase pressure calculation
+        self.format_name = format_name or "t20"
+        self.total_overs = {"t20": 20, "odi": 50, "test": 450}.get(self.format_name.lower(), 20)
 
     def calculate_probabilities(self, ctx: SimulationContext) -> Dict[str, float]:
         """Calculate outcome probabilities for a single ball."""
@@ -370,7 +388,7 @@ class ProbabilityModel:
         result = dict(probs)
         pressure = self.params["pressure"].get("required_rate", {})
 
-        balls_remaining = (20 - ctx.overs) * 6
+        balls_remaining = (self.total_overs - ctx.overs) * 6
         if balls_remaining <= 0:
             return result
 
@@ -401,6 +419,6 @@ class ProbabilityModel:
 
 
 @lru_cache
-def get_probability_model() -> ProbabilityModel:
-    """Get cached probability model instance."""
-    return ProbabilityModel()
+def get_probability_model(format_name: str = "t20") -> ProbabilityModel:
+    """Get cached probability model instance for the specified format."""
+    return ProbabilityModel(format_name=format_name)

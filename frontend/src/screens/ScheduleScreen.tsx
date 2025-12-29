@@ -1,25 +1,218 @@
 import { useState } from 'react';
 import { useGameStore } from '../store/gameStore';
-import { InningsState } from '../types';
+import { InningsState, MatchFormat } from '../types';
+import { COUNTRIES } from '../data/countries';
 
 type Filter = 'all' | 'your' | 'upcoming' | 'completed';
+type IntlFilter = 'all' | 't20' | 'odi' | 'test';
+
+const FORMAT_LABELS: Record<MatchFormat, string> = {
+  t20: 'T20I',
+  odi: 'ODI',
+  test: 'Test',
+};
+
+const FORMAT_COLORS: Record<MatchFormat, string> = {
+  t20: 'bg-purple-600',
+  odi: 'bg-blue-600',
+  test: 'bg-red-600',
+};
 
 export const ScheduleScreen = () => {
   const {
+    gameMode,
+    country,
     fixtures,
     teams,
     players,
     playerTeamId,
     pointsTable,
+    internationalCalendar,
+    manager,
     navigateTo,
     selectMatch,
     openPlayerModal,
     openTeamModal,
   } = useGameStore();
 
+  // State hooks must be at top level (before any conditionals)
+  const [intlFilter, setIntlFilter] = useState<IntlFilter>('all');
   const [filter, setFilter] = useState<Filter>('your');
   const [selectedFixtureId, setSelectedFixtureId] = useState<string | null>(null);
   const [showScorecard, setShowScorecard] = useState<string | null>(null);
+
+  // International Mode Schedule
+  if (gameMode === 'international' && country) {
+    const countryConfig = COUNTRIES[country];
+
+    const filteredSeries = internationalCalendar?.series.filter(s =>
+      intlFilter === 'all' || s.format === intlFilter
+    ) || [];
+
+    const iccEvents = internationalCalendar?.iccEvents || [];
+
+    return (
+      <div className="min-h-screen bg-gray-900 text-white pb-24">
+        {/* Header */}
+        <header className="bg-gradient-to-r from-blue-900 to-indigo-900 p-4 border-b border-blue-700">
+          <div className="max-w-lg mx-auto">
+            <h1 className="text-xl font-bold">International Calendar</h1>
+            <p className="text-sm text-blue-300">{countryConfig?.name} Cricket • {internationalCalendar?.year || 2025}</p>
+          </div>
+        </header>
+
+        <div className="max-w-lg mx-auto p-4 space-y-4">
+          {/* Format Filter */}
+          <div className="flex gap-2 overflow-x-auto pb-2">
+            {(['all', 't20', 'odi', 'test'] as IntlFilter[]).map((f) => (
+              <button
+                key={f}
+                onClick={() => setIntlFilter(f)}
+                className={`px-4 py-2 rounded-full text-sm whitespace-nowrap transition-colors ${
+                  intlFilter === f
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                }`}
+              >
+                {f === 'all' ? 'All Formats' : FORMAT_LABELS[f as MatchFormat]}
+              </button>
+            ))}
+          </div>
+
+          {/* Calendar Summary */}
+          <div className="bg-gray-800 rounded-xl p-4 border border-gray-700">
+            <h3 className="text-sm font-semibold text-gray-400 mb-3">SEASON SUMMARY</h3>
+            <div className="grid grid-cols-4 gap-2 text-center">
+              <div>
+                <div className="text-lg font-bold text-purple-400">
+                  {internationalCalendar?.series.filter(s => s.format === 't20').reduce((sum, s) => sum + s.matches, 0) || 0}
+                </div>
+                <div className="text-xs text-gray-500">T20Is</div>
+              </div>
+              <div>
+                <div className="text-lg font-bold text-blue-400">
+                  {internationalCalendar?.series.filter(s => s.format === 'odi').reduce((sum, s) => sum + s.matches, 0) || 0}
+                </div>
+                <div className="text-xs text-gray-500">ODIs</div>
+              </div>
+              <div>
+                <div className="text-lg font-bold text-red-400">
+                  {internationalCalendar?.series.filter(s => s.format === 'test').reduce((sum, s) => sum + s.matches, 0) || 0}
+                </div>
+                <div className="text-xs text-gray-500">Tests</div>
+              </div>
+              <div>
+                <div className="text-lg font-bold text-yellow-400">
+                  {iccEvents.length}
+                </div>
+                <div className="text-xs text-gray-500">ICC</div>
+              </div>
+            </div>
+          </div>
+
+          {/* ICC Events */}
+          {iccEvents.length > 0 && (intlFilter === 'all' || iccEvents.some(e => e.format === intlFilter)) && (
+            <div className="bg-gradient-to-r from-purple-900/30 to-pink-900/30 rounded-xl p-4 border border-purple-700">
+              <h3 className="text-sm font-semibold text-purple-400 mb-3">ICC EVENTS</h3>
+              <div className="space-y-3">
+                {iccEvents
+                  .filter(e => intlFilter === 'all' || e.format === intlFilter)
+                  .map(event => (
+                  <div key={event.id} className="bg-gray-800/50 rounded-lg p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="font-medium">{event.name}</h4>
+                      <span className={`text-xs px-2 py-1 rounded ${FORMAT_COLORS[event.format]}`}>
+                        {FORMAT_LABELS[event.format]}
+                      </span>
+                    </div>
+                    <div className="text-sm text-gray-400 mb-2">
+                      {event.hostCountries.map(c => COUNTRIES[c]?.flag).join(' ')} • {event.participatingTeams} Teams
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      Stages: {event.stages.map(s => s.name).join(' → ')}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Bilateral Series */}
+          <div className="space-y-3">
+            <h3 className="text-sm font-semibold text-gray-400">BILATERAL SERIES</h3>
+            {filteredSeries.length === 0 ? (
+              <div className="text-center text-gray-500 py-8">No series scheduled</div>
+            ) : (
+              filteredSeries.map((series) => {
+                const opponentConfig = COUNTRIES[series.opponent];
+                const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+                return (
+                  <div
+                    key={series.id}
+                    className={`rounded-xl p-4 border ${
+                      series.status === 'ongoing'
+                        ? 'bg-green-900/20 border-green-700'
+                        : series.status === 'completed'
+                        ? 'bg-gray-800/50 border-gray-700'
+                        : 'bg-gray-800 border-gray-700'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xl">{opponentConfig?.flag}</span>
+                        <span className="font-medium">{series.name}</span>
+                      </div>
+                      <span className={`text-xs px-2 py-1 rounded ${FORMAT_COLORS[series.format]}`}>
+                        {FORMAT_LABELS[series.format]}
+                      </span>
+                    </div>
+
+                    {series.trophy && (
+                      <div className="text-sm text-yellow-400 mb-2">{series.trophy}</div>
+                    )}
+
+                    <div className="flex items-center justify-between text-sm">
+                      <div className="text-gray-400">
+                        {series.matches} Matches • <span className="capitalize">{series.venue}</span>
+                      </div>
+                      <div className="text-gray-500">
+                        {monthNames[series.startMonth - 1]} {series.year}
+                      </div>
+                    </div>
+
+                    {series.status === 'ongoing' && (
+                      <div className="mt-3 pt-3 border-t border-green-700/50">
+                        <button
+                          onClick={() => navigateTo('match-prep')}
+                          className="w-full py-2 bg-green-600 hover:bg-green-700 rounded-lg text-sm font-medium transition-colors"
+                        >
+                          View Current Match
+                        </button>
+                      </div>
+                    )}
+
+                    {series.status === 'completed' && series.results && (
+                      <div className="mt-2 text-sm">
+                        <span className={series.results.wins > series.results.losses ? 'text-green-400' : 'text-red-400'}>
+                          {series.results.wins}W {series.results.losses}L
+                          {series.results.draws > 0 && ` ${series.results.draws}D`}
+                        </span>
+                        <span className="text-gray-500 ml-2">
+                          {series.results.wins > series.results.losses ? 'Series Won' :
+                           series.results.wins < series.results.losses ? 'Series Lost' : 'Series Drawn'}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const playerTeam = teams.find((t) => t.id === playerTeamId);
 
