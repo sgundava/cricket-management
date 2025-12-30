@@ -2,6 +2,7 @@
 
 from typing import Dict, List, Optional, Literal, Union
 from pydantic import BaseModel, Field
+from enum import Enum
 
 from app.schemas.common import (
     MatchPhase,
@@ -13,6 +14,33 @@ from app.schemas.common import (
     OutcomeType,
 )
 from app.schemas.player import PlayerStats, BatterStats, BowlerStats
+
+
+# ============================================
+# TEST MATCH ENUMS AND CONSTANTS
+# ============================================
+
+class TestSession(str, Enum):
+    """Sessions in a Test match day."""
+    MORNING = "morning"     # 10:00-12:30 (30 overs typical)
+    AFTERNOON = "afternoon"  # 13:10-15:40 (30 overs typical)
+    EVENING = "evening"     # 16:00-18:00 (30 overs typical)
+
+
+class WeatherCondition(str, Enum):
+    """Weather conditions that affect play."""
+    CLEAR = "clear"
+    OVERCAST = "overcast"
+    LIGHT_RAIN = "light_rain"
+    HEAVY_RAIN = "heavy_rain"
+    BAD_LIGHT = "bad_light"
+
+
+# Test match constants (based on analysis of 866 real matches)
+TEST_OVERS_PER_DAY = 90
+TEST_OVERS_PER_SESSION = 30
+TEST_MAX_DAYS = 5
+FOLLOW_ON_THRESHOLD = 200  # Runs behind to enforce follow-on
 
 
 # ============================================
@@ -54,6 +82,61 @@ class PitchConditions(BaseModel):
     spin: int = Field(ge=0, le=100, description="Helps spinners")
     bounce: int = Field(ge=0, le=100, description="True bounce")
     deterioration: int = Field(ge=0, le=100, default=0, description="How much it changes")
+
+
+# ============================================
+# TEST MATCH STATE
+# ============================================
+
+class TestDayState(BaseModel):
+    """State tracking for a Test match day."""
+    day: int = Field(ge=1, le=5, description="Current day (1-5)")
+    session: TestSession = TestSession.MORNING
+    overs_bowled_today: int = 0
+    overs_remaining_today: int = TEST_OVERS_PER_DAY
+    overs_lost_to_weather: int = 0
+
+
+class TestMatchState(BaseModel):
+    """
+    Full Test match state tracking days, sessions, weather, and special rules.
+    Based on analysis of 866 real Test matches.
+    """
+    # Day tracking
+    current_day: int = 1
+    current_session: TestSession = TestSession.MORNING
+    total_overs_bowled: int = 0
+    overs_bowled_today: int = 0
+
+    # Weather tracking
+    current_weather: WeatherCondition = WeatherCondition.CLEAR
+    total_overs_lost: int = 0
+    overs_lost_today: int = 0
+
+    # Innings tracking (Test has up to 4 innings)
+    current_innings: int = 1  # 1-4
+    innings_runs: List[int] = Field(default_factory=lambda: [0, 0, 0, 0])
+    innings_wickets: List[int] = Field(default_factory=lambda: [0, 0, 0, 0])
+    innings_declared: List[bool] = Field(default_factory=lambda: [False, False, False, False])
+    innings_complete: List[bool] = Field(default_factory=lambda: [False, False, False, False])
+
+    # Follow-on tracking
+    follow_on_available: bool = False
+    follow_on_enforced: bool = False
+
+    # Result tracking
+    match_complete: bool = False
+    result: Optional[str] = None  # "team1_win", "team2_win", "draw"
+    result_margin: Optional[str] = None  # "by X runs", "by X wickets", "innings and X runs"
+
+
+class WeatherEvent(BaseModel):
+    """Weather event that interrupts play."""
+    day: int
+    session: TestSession
+    condition: WeatherCondition
+    overs_lost: int
+    description: str
 
 
 # ============================================

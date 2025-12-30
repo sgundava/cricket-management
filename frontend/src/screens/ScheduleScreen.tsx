@@ -330,44 +330,87 @@ export const ScheduleScreen = () => {
                           </div>
 
                           {match?.status === 'completed' && match.innings1 && match.innings2 && (() => {
+                            const isTest = series.format === 'test';
                             const inn1 = match.innings1;
                             const inn2 = match.innings2;
+                            const inn3 = match.innings3;
+                            const inn4 = match.innings4;
                             const playerBattedFirst = inn1.battingTeam === playerTeamId;
-                            const playerRuns = playerBattedFirst ? inn1.runs : inn2.runs;
-                            const playerWickets = playerBattedFirst ? inn1.wickets : inn2.wickets;
-                            const playerOvers = playerBattedFirst ? inn1.overs : inn2.overs;
-                            const oppRuns = playerBattedFirst ? inn2.runs : inn1.runs;
-                            const oppWickets = playerBattedFirst ? inn2.wickets : inn1.wickets;
-                            const oppOvers = playerBattedFirst ? inn2.overs : inn1.overs;
 
-                            const playerWon = playerBattedFirst
-                              ? inn1.runs > inn2.runs
-                              : inn2.runs > inn1.runs;
-                            const isDraw = inn1.runs === inn2.runs;
+                            // For Test: calculate total runs across both innings for each team
+                            // Innings 1 & 3 are same team, Innings 2 & 4 are same team
+                            let playerTotal = 0;
+                            let oppTotal = 0;
+
+                            if (isTest) {
+                              // Player's team runs (innings 1+3 or 2+4 depending on who batted first)
+                              if (playerBattedFirst) {
+                                playerTotal = inn1.runs + (inn3?.runs || 0);
+                                oppTotal = inn2.runs + (inn4?.runs || 0);
+                              } else {
+                                playerTotal = inn2.runs + (inn4?.runs || 0);
+                                oppTotal = inn1.runs + (inn3?.runs || 0);
+                              }
+                            }
+
+                            const playerWon = isTest
+                              ? playerTotal > oppTotal
+                              : (playerBattedFirst ? inn1.runs > inn2.runs : inn2.runs > inn1.runs);
+                            const isDraw = isTest
+                              ? (match.result?.winner === null || playerTotal === oppTotal)
+                              : inn1.runs === inn2.runs;
 
                             return (
                               <div>
-                                <div className="flex items-center justify-between text-sm mb-2">
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-lg">{countryConfig?.flag}</span>
-                                    <span className={playerWon ? 'text-green-400 font-medium' : ''}>
-                                      {playerRuns}/{playerWickets} ({playerOvers} ov)
-                                    </span>
+                                {isTest ? (
+                                  // Test match: show all innings
+                                  <div className="space-y-2 mb-2">
+                                    {/* Team 1 - Both Innings */}
+                                    <div className="flex items-center gap-2 text-sm">
+                                      <span className="text-lg">{playerBattedFirst ? countryConfig?.flag : opponentConfig?.flag}</span>
+                                      <div className="flex-1">
+                                        <span className={!playerBattedFirst && playerWon ? '' : playerBattedFirst && playerWon ? 'text-green-400' : ''}>
+                                          {inn1.runs}/{inn1.wickets}
+                                        </span>
+                                        {inn3 && (
+                                          <span className="text-gray-400"> & {inn3.runs}/{inn3.wickets}</span>
+                                        )}
+                                      </div>
+                                    </div>
+                                    {/* Team 2 - Both Innings */}
+                                    <div className="flex items-center gap-2 text-sm">
+                                      <span className="text-lg">{playerBattedFirst ? opponentConfig?.flag : countryConfig?.flag}</span>
+                                      <div className="flex-1">
+                                        <span className={playerBattedFirst && playerWon ? '' : !playerBattedFirst && playerWon ? 'text-green-400' : ''}>
+                                          {inn2.runs}/{inn2.wickets}
+                                        </span>
+                                        {inn4 && (
+                                          <span className="text-gray-400"> & {inn4.runs}/{inn4.wickets}</span>
+                                        )}
+                                      </div>
+                                    </div>
                                   </div>
-                                  <span className="text-gray-500">vs</span>
-                                  <div className="flex items-center gap-2">
-                                    <span className={!playerWon && !isDraw ? 'text-green-400 font-medium' : ''}>
-                                      {oppRuns}/{oppWickets} ({oppOvers} ov)
-                                    </span>
-                                    <span className="text-lg">{opponentConfig?.flag}</span>
+                                ) : (
+                                  // T20/ODI: single innings each
+                                  <div className="flex items-center justify-between text-sm mb-2">
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-lg">{countryConfig?.flag}</span>
+                                      <span className={playerWon ? 'text-green-400 font-medium' : ''}>
+                                        {playerBattedFirst ? inn1.runs : inn2.runs}/{playerBattedFirst ? inn1.wickets : inn2.wickets} ({playerBattedFirst ? inn1.overs : inn2.overs} ov)
+                                      </span>
+                                    </div>
+                                    <span className="text-gray-500">vs</span>
+                                    <div className="flex items-center gap-2">
+                                      <span className={!playerWon && !isDraw ? 'text-green-400 font-medium' : ''}>
+                                        {playerBattedFirst ? inn2.runs : inn1.runs}/{playerBattedFirst ? inn2.wickets : inn1.wickets} ({playerBattedFirst ? inn2.overs : inn1.overs} ov)
+                                      </span>
+                                      <span className="text-lg">{opponentConfig?.flag}</span>
+                                    </div>
                                   </div>
-                                </div>
+                                )}
                                 <div className="text-center">
                                   <span className={`text-xs ${playerWon ? 'text-green-400' : isDraw ? 'text-gray-400' : 'text-red-400'}`}>
-                                    {playerWon ? 'Won by ' : isDraw ? 'Match Drawn' : 'Lost by '}
-                                    {!isDraw && (playerBattedFirst
-                                      ? `${inn1.runs - inn2.runs} runs`
-                                      : `${10 - inn2.wickets} wickets`)}
+                                    {isDraw ? 'Match Drawn' : playerWon ? `Won by ${match.result || (isTest ? `${Math.abs(playerTotal - oppTotal)} runs` : (playerBattedFirst ? `${inn1.runs - inn2.runs} runs` : `${10 - inn2.wickets} wickets`))}` : `Lost`}
                                   </span>
                                 </div>
                                 <button

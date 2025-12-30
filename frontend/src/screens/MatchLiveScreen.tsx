@@ -74,6 +74,12 @@ export const MatchLiveScreen = () => {
   // Test cricket: track all innings totals [innings1, innings2, innings3, innings4]
   const [inningsTotals, setInningsTotals] = useState<[number, number, number, number]>([0, 0, 0, 0]);
 
+  // Test cricket: day and session tracking
+  const [testDay, setTestDay] = useState(1);
+  const [testSession, setTestSession] = useState<'Morning' | 'Afternoon' | 'Evening'>('Morning');
+  const OVERS_PER_SESSION = 30;
+  const OVERS_PER_DAY = 90;
+
   // Ball-by-ball state
   const [recentBalls, setRecentBalls] = useState<BallEvent[]>([]);
   const [showNewBatsmanModal, setShowNewBatsmanModal] = useState(false);
@@ -100,6 +106,31 @@ export const MatchLiveScreen = () => {
       navigateTo('home');
     }
   }, [match?.status]);
+
+  // Update day/session based on total overs bowled (across all innings) for Test matches
+  useEffect(() => {
+    if (match?.format !== 'test' || !inningsState) return;
+
+    // Calculate total overs across all innings
+    const previousInningsOvers = inningsTotals.reduce((sum, _, idx) => {
+      if (idx < currentInnings - 1) {
+        // Estimate overs from previous innings (rough: runs / 3.5 run rate)
+        return sum + Math.min(150, Math.floor(inningsTotals[idx] / 3.5));
+      }
+      return sum;
+    }, 0);
+    const totalOvers = previousInningsOvers + (inningsState?.overs || 0);
+
+    // Calculate day and session from total overs
+    const newDay = Math.min(5, Math.floor(totalOvers / OVERS_PER_DAY) + 1);
+    const oversToday = totalOvers % OVERS_PER_DAY;
+    const sessionIndex = Math.floor(oversToday / OVERS_PER_SESSION);
+    const sessions: ('Morning' | 'Afternoon' | 'Evening')[] = ['Morning', 'Afternoon', 'Evening'];
+    const newSession = sessions[Math.min(2, sessionIndex)];
+
+    if (newDay !== testDay) setTestDay(newDay);
+    if (newSession !== testSession) setTestSession(newSession);
+  }, [match?.format, inningsState?.overs, currentInnings, inningsTotals, testDay, testSession, OVERS_PER_DAY, OVERS_PER_SESSION]);
 
   const homeTeam = teams.find((t) => t.id === match?.homeTeam);
   const awayTeam = teams.find((t) => t.id === match?.awayTeam);
@@ -1108,6 +1139,86 @@ export const MatchLiveScreen = () => {
     });
   }, [match, players, updatePlayerState]);
 
+  // Declare innings (Test matches only)
+  const declareInnings = useCallback(() => {
+    if (!match || !inningsState || match.format !== 'test') return;
+    if (matchEnded || currentInnings >= 4) return;
+
+    // Only allow declaration if player's team is batting
+    const isPlayerBatting = inningsState.battingTeam === playerTeamId;
+    if (!isPlayerBatting) return;
+
+    // Update innings totals
+    const newTotals = [...inningsTotals] as [number, number, number, number];
+    newTotals[currentInnings - 1] = inningsState.runs;
+    setInningsTotals(newTotals);
+
+    // Stop any auto simulation
+    setIsSimulating(false);
+
+    // Transition to next innings
+    const nextInnings = (currentInnings + 1) as 1 | 2 | 3 | 4;
+
+    // Get who batted first from innings 1
+    const firstInningsBatter = match.innings1?.battingTeam || inningsState.battingTeam;
+    const firstInningsBowler = match.innings1?.bowlingTeam || inningsState.bowlingTeam;
+
+    let newBattingTeam: string;
+    let newBowlingTeam: string;
+
+    if (nextInnings % 2 === 1) {
+      // Odd innings (3rd) - same as 1st
+      newBattingTeam = firstInningsBatter;
+      newBowlingTeam = firstInningsBowler;
+    } else {
+      // Even innings (2nd, 4th) - opposite of 1st
+      newBattingTeam = firstInningsBowler;
+      newBowlingTeam = firstInningsBatter;
+    }
+
+    const newBattingPlayers = newBattingTeam === match.homeTeam ? homePlayers : awayPlayers;
+    const captain = newBattingPlayers.find(p => p.role === 'batsman' || p.role === 'allrounder') || newBattingPlayers[0];
+    const newBattingTactics = newBattingTeam === match.homeTeam
+      ? match.homeTactics || generateDefaultTactics(newBattingPlayers, captain?.id || newBattingPlayers[0]?.id)
+      : match.awayTactics || generateDefaultTactics(newBattingPlayers, captain?.id || newBattingPlayers[0]?.id);
+
+    // Initialize new innings
+    const newInnings: InningsState = {
+      battingTeam: newBattingTeam,
+      bowlingTeam: newBowlingTeam,
+      runs: 0,
+      wickets: 0,
+      overs: 0,
+      balls: 0,
+      overSummaries: [],
+      fallOfWickets: [],
+      batterStats: new Map(),
+      bowlerStats: new Map(),
+      currentBatters: [newBattingTactics.playingXI[0], newBattingTactics.playingXI[1]],
+      currentBowler: '',
+    };
+
+    // Save current innings as declared
+    const inningsKey = `innings${currentInnings}` as keyof typeof match;
+    updateMatch(match.id, {
+      [inningsKey]: {
+        battingTeam: inningsState.battingTeam,
+        bowlingTeam: inningsState.bowlingTeam,
+        runs: inningsState.runs,
+        wickets: inningsState.wickets,
+        overs: inningsState.overs,
+        declared: true,
+      },
+    });
+
+    setCurrentInnings(nextInnings);
+    setInningsState(newInnings);
+    setLastOver(null);
+    setRecentBalls([]);
+
+    console.log(`[DECLARE] Innings ${currentInnings} declared at ${inningsState.runs}/${inningsState.wickets}`);
+  }, [match, inningsState, currentInnings, matchEnded, playerTeamId, inningsTotals, homePlayers, awayPlayers, updateMatch]);
+
   // Auto-simulate with mode support
   useEffect(() => {
     if (!isSimulating || matchEnded || showNewBatsmanModal) return;
@@ -1173,11 +1284,24 @@ export const MatchLiveScreen = () => {
               {homeTeamShortName} vs {awayTeamShortName}
             </span>
           </div>
-          <span className="text-sm text-gray-400">
-            {currentInnings === 1 ? '1st Innings' :
-             currentInnings === 2 ? '2nd Innings' :
-             currentInnings === 3 ? '3rd Innings' : '4th Innings'}
-          </span>
+          <div className="flex items-center gap-3">
+            {/* Test match: Day and Session indicator */}
+            {match.format === 'test' && (
+              <div className="flex items-center gap-2 text-sm">
+                <span className="bg-amber-600/80 text-white px-2 py-0.5 rounded text-xs font-medium">
+                  Day {testDay}
+                </span>
+                <span className="text-amber-400 text-xs">
+                  {testSession}
+                </span>
+              </div>
+            )}
+            <span className="text-sm text-gray-400">
+              {currentInnings === 1 ? '1st Innings' :
+               currentInnings === 2 ? '2nd Innings' :
+               currentInnings === 3 ? '3rd Innings' : '4th Innings'}
+            </span>
+          </div>
         </div>
       </header>
 
@@ -2115,6 +2239,20 @@ export const MatchLiveScreen = () => {
                 {isLoading ? 'Simulating...' : 'Next Over'}
               </button>
             </div>
+
+            {/* Declare Innings (Test only, when player's team is batting) */}
+            {match.format === 'test' &&
+             inningsState?.battingTeam === playerTeamId &&
+             currentInnings < 4 &&
+             inningsState.runs >= 100 && (
+              <button
+                onClick={declareInnings}
+                disabled={isSimulating || isLoading}
+                className="w-full py-3 bg-amber-700 hover:bg-amber-600 disabled:opacity-50 rounded-lg font-medium transition-colors border border-amber-500"
+              >
+                Declare Innings ({inningsState.runs}/{inningsState.wickets})
+              </button>
+            )}
           </div>
         )}
 

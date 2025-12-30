@@ -1,0 +1,54 @@
+{
+  "weather_by_country": {
+    "England": {
+      "rain_probability": 29,
+      "avg_overs_lost_if_rain": 44
+    },
+    "West Indies": {
+      "rain_probability": 36,
+      "avg_overs_lost_if_rain": 54
+    },
+    "Other": {
+      "rain_probability": 28,
+      "avg_overs_lost_if_rain": 42
+    },
+    "Australia": {
+      "rain_probability": 29,
+      "avg_overs_lost_if_rain": 43
+    },
+    "New Zealand": {
+      "rain_probability": 30,
+      "avg_overs_lost_if_rain": 45
+    },
+    "Sri Lanka": {
+      "rain_probability": 29,
+      "avg_overs_lost_if_rain": 43
+    },
+    "Pakistan": {
+      "rain_probability": 26,
+      "avg_overs_lost_if_rain": 39
+    },
+    "South Africa": {
+      "rain_probability": 33,
+      "avg_overs_lost_if_rain": 50
+    },
+    "India": {
+      "rain_probability": 38,
+      "avg_overs_lost_if_rain": 57
+    },
+    "Bangladesh": {
+      "rain_probability": 35,
+      "avg_overs_lost_if_rain": 52
+    },
+    "UAE": {
+      "rain_probability": 15,
+      "avg_overs_lost_if_rain": 23
+    }
+  },
+  "draw_rate": 19.7,
+  "follow_on_enforcement_rate": 10.1,
+  "follow_on_threshold_runs": 200,
+  "overs_per_day": 90,
+  "sessions_per_day": 3,
+  "max_days": 5
+}
