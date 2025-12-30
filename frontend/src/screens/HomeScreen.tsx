@@ -43,22 +43,32 @@ export const HomeScreen = () => {
     const countryConfig = COUNTRIES[country];
     const currentMonth = new Date().getMonth() + 1; // 1-12
 
-    // Get upcoming series from calendar
+    // Helper to check if a series has been started (has at least one match fixture)
+    const getSeriesMatchCount = (seriesId: string) => {
+      return fixtures.filter(f => f.id.includes(seriesId)).length;
+    };
+
+    // Get upcoming series from calendar (not yet started)
     const upcomingSeries = internationalCalendar?.series
-      .filter(s => s.startMonth >= currentMonth)
+      .filter(s => s.startMonth >= currentMonth && getSeriesMatchCount(s.id) === 0)
       .slice(0, 3) || [];
 
+    // Find the ACTIVE series (has started but not completed)
     const currentSeries = internationalCalendar?.series
-      .find(s => s.startMonth === currentMonth);
+      .find(s => {
+        const matchesPlayed = getSeriesMatchCount(s.id);
+        // Series is "current" if it has started (matchesPlayed > 0) but not finished
+        return matchesPlayed > 0 && matchesPlayed < s.matches;
+      });
 
     // Get ICC events
     const upcomingIccEvents = internationalCalendar?.iccEvents || [];
 
     return (
-      <div className="min-h-screen bg-gray-900 text-white pb-24">
+      <div className="min-h-screen bg-gray-900 text-white pb-24 lg:pb-4">
         {/* Header */}
         <header className="bg-gradient-to-r from-blue-900 to-indigo-900 p-4 border-b border-blue-700">
-          <div className="max-w-lg mx-auto flex items-center justify-between">
+          <div className="max-w-lg md:max-w-3xl lg:max-w-5xl mx-auto flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="text-3xl">{countryConfig?.flag}</div>
               <div>
@@ -76,15 +86,18 @@ export const HomeScreen = () => {
           </div>
         </header>
 
-        <div className="max-w-lg mx-auto p-4 space-y-4">
-          {/* Play Next Match - Primary Action */}
+        <div className="max-w-lg md:max-w-3xl lg:max-w-5xl mx-auto p-4 md:p-6">
+          {/* Responsive grid: 1 col mobile, 2 col tablet, 3 col desktop */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+
+          {/* Play Next Match - Primary Action - spans 2 cols on larger screens */}
           {(() => {
             // Find the next series that has matches remaining
             const allSeries = internationalCalendar?.series || [];
 
-            // Helper to check if a series has matches remaining
+            // Helper to check if a series has matches remaining (only count completed matches)
             const getSeriesProgress = (series: typeof allSeries[0]) => {
-              const matchesPlayed = fixtures.filter(f => f.id.includes(series.id)).length;
+              const matchesPlayed = fixtures.filter(f => f.id.includes(series.id) && f.status === 'completed').length;
               return { matchesPlayed, remaining: series.matches - matchesPlayed };
             };
 
@@ -95,9 +108,9 @@ export const HomeScreen = () => {
             const nextAvailableSeries = sortedSeries.find(s => getSeriesProgress(s).remaining > 0);
 
             if (!nextAvailableSeries) {
-              // All series complete
+              // All series complete - full width
               return (
-                <div className="bg-gradient-to-r from-green-900/50 to-emerald-900/50 rounded-xl p-4 border border-green-700 text-center">
+                <div className="md:col-span-2 lg:col-span-3 bg-gradient-to-r from-green-900/50 to-emerald-900/50 rounded-xl p-4 md:p-6 border border-green-700 text-center">
                   <div className="text-2xl mb-2">🏆</div>
                   <h3 className="text-lg font-bold text-green-400">Season Complete!</h3>
                   <p className="text-sm text-gray-400 mt-2">You've completed all scheduled series.</p>
@@ -109,7 +122,7 @@ export const HomeScreen = () => {
             const nextMatchNum = matchesPlayed + 1;
 
             return (
-            <div className="bg-gradient-to-r from-blue-900/50 to-indigo-900/50 rounded-xl p-4 border border-blue-700">
+            <div className="lg:col-span-2 bg-gradient-to-r from-blue-900/50 to-indigo-900/50 rounded-xl p-4 md:p-6 border border-blue-700">
               <div className="flex justify-between items-center mb-3">
                 <span className="text-sm font-medium text-blue-400">
                   MATCH {nextMatchNum} OF {nextAvailableSeries.matches}
@@ -238,28 +251,26 @@ export const HomeScreen = () => {
             </div>
           </div>
 
-          {/* Quick Links */}
-          <div className="grid grid-cols-2 gap-3">
-            <button
-              onClick={() => navigateTo('schedule')}
-              className="bg-gray-800 rounded-xl p-4 border border-gray-700 text-left hover:bg-gray-700/50 transition-colors"
-            >
-              <div className="text-lg mb-1">📅</div>
-              <div className="text-sm font-medium">Calendar</div>
-              <div className="text-xs text-gray-500">Series & ICC events</div>
-            </button>
-            <button
-              onClick={() => navigateTo('squad')}
-              className="bg-gray-800 rounded-xl p-4 border border-gray-700 text-left hover:bg-gray-700/50 transition-colors"
-            >
-              <div className="text-lg mb-1">👥</div>
-              <div className="text-sm font-medium">Squad</div>
-              <div className="text-xs text-gray-500">National team pool</div>
-            </button>
-          </div>
+          {/* Quick Links - each takes 1 col */}
+          <button
+            onClick={() => navigateTo('schedule')}
+            className="bg-gray-800 rounded-xl p-4 border border-gray-700 text-left hover:bg-gray-700/50 transition-colors"
+          >
+            <div className="text-lg md:text-xl mb-1">📅</div>
+            <div className="text-sm md:text-base font-medium">Calendar</div>
+            <div className="text-xs text-gray-500">Series & ICC events</div>
+          </button>
+          <button
+            onClick={() => navigateTo('squad')}
+            className="bg-gray-800 rounded-xl p-4 border border-gray-700 text-left hover:bg-gray-700/50 transition-colors"
+          >
+            <div className="text-lg md:text-xl mb-1">👥</div>
+            <div className="text-sm md:text-base font-medium">Squad</div>
+            <div className="text-xs text-gray-500">National team pool</div>
+          </button>
 
-          {/* Reputation */}
-          <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700">
+          {/* Reputation - full width on desktop */}
+          <div className="lg:col-span-3 bg-gray-800/50 rounded-xl p-4 border border-gray-700">
             <div className="flex justify-between items-center">
               <span className="text-sm text-gray-400">International Reputation</span>
               <span className="font-bold text-blue-400">{manager.reputation.international}</span>
@@ -271,6 +282,8 @@ export const HomeScreen = () => {
               />
             </div>
           </div>
+
+          </div> {/* End of grid */}
         </div>
       </div>
     );
@@ -338,27 +351,30 @@ export const HomeScreen = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white pb-24">
+    <div className="min-h-screen bg-gray-900 text-white pb-24 lg:pb-4">
       {/* Header */}
       <header className="bg-gray-800 p-4 border-b border-gray-700">
-        <div className="max-w-lg mx-auto flex items-center justify-between">
+        <div className="max-w-lg md:max-w-3xl lg:max-w-5xl mx-auto flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-bold">{playerTeam?.name || 'Cricket Manager'}</h1>
+            <h1 className="text-xl md:text-2xl font-bold">{playerTeam?.name || 'Cricket Manager'}</h1>
             <p className="text-sm text-gray-400">Season {season} • {manager.name}</p>
           </div>
           <div className="text-right">
-            <div className="text-2xl font-bold">#{tablePosition}</div>
-            <div className="text-xs text-gray-400">
+            <div className="text-2xl md:text-3xl font-bold">#{tablePosition}</div>
+            <div className="text-xs md:text-sm text-gray-400">
               {tableEntry?.won || 0}W {tableEntry?.lost || 0}L
             </div>
           </div>
         </div>
       </header>
 
-      <div className="max-w-lg mx-auto p-4 space-y-4">
-        {/* Season Complete Card */}
+      <div className="max-w-lg md:max-w-3xl lg:max-w-5xl mx-auto p-4 md:p-6">
+        {/* Responsive grid: 1 col mobile, 2 col tablet, 3 col desktop */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+
+        {/* Season Complete Card - full width */}
         {phase === 'off-season' && (
-          <div className="bg-gradient-to-r from-yellow-900/50 to-amber-900/50 rounded-xl p-6 border border-yellow-700">
+          <div className="md:col-span-2 lg:col-span-3 bg-gradient-to-r from-yellow-900/50 to-amber-900/50 rounded-xl p-6 border border-yellow-700">
             <h2 className="text-xl font-bold text-center mb-4">Season Complete!</h2>
             {seasonResult && (
               <div className="text-center space-y-2">
@@ -387,9 +403,9 @@ export const HomeScreen = () => {
           </div>
         )}
 
-        {/* Next Match Card */}
+        {/* Next Match Card - spans 2 cols on desktop for prominence */}
         {nextMatch && opponent && phase !== 'off-season' && (
-          <div className={`rounded-xl p-4 border ${
+          <div className={`lg:col-span-2 rounded-xl p-4 md:p-6 border ${
             nextMatch.matchType !== 'league'
               ? 'bg-gradient-to-r from-purple-900/50 to-blue-900/50 border-purple-700'
               : 'bg-gray-800 border-gray-700'
@@ -491,22 +507,23 @@ export const HomeScreen = () => {
 
         {/* Quick Status */}
         <div className="bg-gray-800 rounded-xl p-4 border border-gray-700">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-6">
+          <h3 className="text-sm font-semibold text-gray-400 mb-3 hidden md:block">SQUAD STATUS</h3>
+          <div className="flex items-center justify-between md:justify-around">
+            <div className="flex items-center gap-6 md:gap-8">
               <div className="text-center">
-                <div className={`text-lg font-bold ${avgMorale > 70 ? 'text-green-400' : avgMorale < 50 ? 'text-red-400' : 'text-yellow-400'}`}>
+                <div className={`text-lg md:text-xl font-bold ${avgMorale > 70 ? 'text-green-400' : avgMorale < 50 ? 'text-red-400' : 'text-yellow-400'}`}>
                   {avgMorale}
                 </div>
                 <div className="text-xs text-gray-500">Morale</div>
               </div>
               <div className="text-center">
-                <div className={`text-lg font-bold ${avgFitness > 70 ? 'text-green-400' : avgFitness < 50 ? 'text-red-400' : 'text-yellow-400'}`}>
+                <div className={`text-lg md:text-xl font-bold ${avgFitness > 70 ? 'text-green-400' : avgFitness < 50 ? 'text-red-400' : 'text-yellow-400'}`}>
                   {avgFitness}
                 </div>
                 <div className="text-xs text-gray-500">Fitness</div>
               </div>
               <div className="text-center">
-                <div className="text-lg font-bold">{teamPlayers.length}</div>
+                <div className="text-lg md:text-xl font-bold">{teamPlayers.length}</div>
                 <div className="text-xs text-gray-500">Squad</div>
               </div>
             </div>
@@ -519,25 +536,25 @@ export const HomeScreen = () => {
           </div>
         </div>
 
-        {/* Quick Links */}
-        <div className="grid grid-cols-2 gap-3">
-          <button
-            onClick={() => navigateTo('schedule')}
-            className="bg-gray-800 rounded-xl p-4 border border-gray-700 text-left hover:bg-gray-700/50 transition-colors"
-          >
-            <div className="text-lg mb-1">📅</div>
-            <div className="text-sm font-medium">Schedule</div>
-            <div className="text-xs text-gray-500">View fixtures & standings</div>
-          </button>
-          <button
-            onClick={() => navigateTo('stats')}
-            className="bg-gray-800 rounded-xl p-4 border border-gray-700 text-left hover:bg-gray-700/50 transition-colors"
-          >
-            <div className="text-lg mb-1">📊</div>
-            <div className="text-sm font-medium">Stats</div>
-            <div className="text-xs text-gray-500">Season leaderboards</div>
-          </button>
-        </div>
+        {/* Quick Links - each takes 1 col */}
+        <button
+          onClick={() => navigateTo('schedule')}
+          className="bg-gray-800 rounded-xl p-4 border border-gray-700 text-left hover:bg-gray-700/50 transition-colors"
+        >
+          <div className="text-lg md:text-xl mb-1">📅</div>
+          <div className="text-sm md:text-base font-medium">Schedule</div>
+          <div className="text-xs text-gray-500">View fixtures & standings</div>
+        </button>
+        <button
+          onClick={() => navigateTo('stats')}
+          className="bg-gray-800 rounded-xl p-4 border border-gray-700 text-left hover:bg-gray-700/50 transition-colors"
+        >
+          <div className="text-lg md:text-xl mb-1">📊</div>
+          <div className="text-sm md:text-base font-medium">Stats</div>
+          <div className="text-xs text-gray-500">Season leaderboards</div>
+        </button>
+
+        </div> {/* End of grid */}
       </div>
     </div>
   );

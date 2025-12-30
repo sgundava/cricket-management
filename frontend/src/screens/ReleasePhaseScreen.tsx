@@ -11,6 +11,7 @@ export const ReleasePhaseScreen = () => {
     releasedPlayers,
     releasePlayer,
     confirmReleases,
+    openPlayerModal,
   } = useGameStore();
 
   const [selectedPlayers, setSelectedPlayers] = useState<Set<string>>(
@@ -139,7 +140,15 @@ export const ReleasePhaseScreen = () => {
                     </div>
                     <div>
                       <div className="font-medium flex items-center gap-2">
-                        {player.shortName}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openPlayerModal(player.id, false);
+                          }}
+                          className="hover:text-blue-400 hover:underline transition-colors"
+                        >
+                          {player.shortName}
+                        </button>
                         {player.contract.isOverseas && (
                           <span className="text-xs bg-blue-900/50 text-blue-300 px-1.5 py-0.5 rounded">OS</span>
                         )}

@@ -40,6 +40,7 @@ export const ScheduleScreen = () => {
   const [filter, setFilter] = useState<Filter>('your');
   const [selectedFixtureId, setSelectedFixtureId] = useState<string | null>(null);
   const [showScorecard, setShowScorecard] = useState<string | null>(null);
+  const [selectedSeriesId, setSelectedSeriesId] = useState<string | null>(null);
 
   // International Mode Schedule
   if (gameMode === 'international' && country) {
@@ -52,16 +53,16 @@ export const ScheduleScreen = () => {
     const iccEvents = internationalCalendar?.iccEvents || [];
 
     return (
-      <div className="min-h-screen bg-gray-900 text-white pb-24">
+      <div className="min-h-screen bg-gray-900 text-white pb-24 lg:pb-4">
         {/* Header */}
         <header className="bg-gradient-to-r from-blue-900 to-indigo-900 p-4 border-b border-blue-700">
-          <div className="max-w-lg mx-auto">
-            <h1 className="text-xl font-bold">International Calendar</h1>
+          <div className="max-w-lg md:max-w-3xl lg:max-w-5xl mx-auto">
+            <h1 className="text-xl md:text-2xl font-bold">International Calendar</h1>
             <p className="text-sm text-blue-300">{countryConfig?.name} Cricket • {internationalCalendar?.year || 2025}</p>
           </div>
         </header>
 
-        <div className="max-w-lg mx-auto p-4 space-y-4">
+        <div className="max-w-lg md:max-w-3xl lg:max-w-5xl mx-auto p-4 md:p-6 space-y-4">
           {/* Format Filter */}
           <div className="flex gap-2 overflow-x-auto pb-2">
             {(['all', 't20', 'odi', 'test'] as IntlFilter[]).map((f) => (
@@ -138,24 +139,26 @@ export const ScheduleScreen = () => {
           )}
 
           {/* Bilateral Series */}
-          <div className="space-y-3">
-            <h3 className="text-sm font-semibold text-gray-400">BILATERAL SERIES</h3>
+          <div>
+            <h3 className="text-sm font-semibold text-gray-400 mb-3">BILATERAL SERIES</h3>
             {filteredSeries.length === 0 ? (
               <div className="text-center text-gray-500 py-8">No series scheduled</div>
             ) : (
-              filteredSeries.map((series) => {
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {filteredSeries.map((series) => {
                 const opponentConfig = COUNTRIES[series.opponent];
                 const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
                 return (
                   <div
                     key={series.id}
-                    className={`rounded-xl p-4 border ${
+                    onClick={() => setSelectedSeriesId(series.id)}
+                    className={`rounded-xl p-4 border cursor-pointer transition-colors ${
                       series.status === 'ongoing'
-                        ? 'bg-green-900/20 border-green-700'
+                        ? 'bg-green-900/20 border-green-700 hover:bg-green-900/30'
                         : series.status === 'completed'
-                        ? 'bg-gray-800/50 border-gray-700'
-                        : 'bg-gray-800 border-gray-700'
+                        ? 'bg-gray-800/50 border-gray-700 hover:bg-gray-700/50'
+                        : 'bg-gray-800 border-gray-700 hover:bg-gray-700'
                     }`}
                   >
                     <div className="flex items-center justify-between mb-2">
@@ -206,9 +209,209 @@ export const ScheduleScreen = () => {
                     )}
                   </div>
                 );
-              })
+              })}
+              </div>
             )}
           </div>
+
+          {/* Series Detail Modal */}
+          {selectedSeriesId && (() => {
+            const series = internationalCalendar?.series.find(s => s.id === selectedSeriesId);
+            if (!series) return null;
+
+            const opponentConfig = COUNTRIES[series.opponent];
+            const seriesMatches = fixtures.filter(f => f.id.includes(series.id));
+            const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+            // Calculate series standings
+            let wins = 0, losses = 0, draws = 0;
+            seriesMatches.filter(m => m.status === 'completed').forEach(match => {
+              if (!match.innings1 || !match.innings2) return;
+              const innings1Runs = match.innings1.runs;
+              const innings2Runs = match.innings2.runs;
+              const playerBattedFirst = match.innings1.battingTeam === playerTeamId;
+
+              if (innings2Runs > innings1Runs) {
+                // Chasing team won
+                if (playerBattedFirst) losses++;
+                else wins++;
+              } else if (innings2Runs < innings1Runs) {
+                // Batting first team won
+                if (playerBattedFirst) wins++;
+                else losses++;
+              } else {
+                draws++;
+              }
+            });
+
+            return (
+              <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+                <div className="bg-gray-800 rounded-xl max-w-lg md:max-w-2xl w-full max-h-[85vh] overflow-hidden flex flex-col">
+                  {/* Modal Header */}
+                  <div className="p-4 border-b border-gray-700 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <span className="text-2xl">{opponentConfig?.flag}</span>
+                      <div>
+                        <h3 className="font-bold text-lg">{series.name}</h3>
+                        <div className="text-sm text-gray-400">
+                          {series.matches} {FORMAT_LABELS[series.format]} Matches • {monthNames[series.startMonth - 1]} {series.year}
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setSelectedSeriesId(null)}
+                      className="text-gray-400 hover:text-white text-xl p-1"
+                    >
+                      ✕
+                    </button>
+                  </div>
+
+                  {/* Series Trophy */}
+                  {series.trophy && (
+                    <div className="px-4 py-2 bg-yellow-900/30 border-b border-yellow-700/50 text-center">
+                      <span className="text-yellow-400 text-sm font-medium">🏆 {series.trophy}</span>
+                    </div>
+                  )}
+
+                  {/* Series Standings */}
+                  <div className="px-4 py-3 bg-gray-700/30 border-b border-gray-700">
+                    <div className="flex justify-center gap-8 text-center">
+                      <div>
+                        <div className="text-2xl font-bold text-green-400">{wins}</div>
+                        <div className="text-xs text-gray-400">WON</div>
+                      </div>
+                      <div>
+                        <div className="text-2xl font-bold text-red-400">{losses}</div>
+                        <div className="text-xs text-gray-400">LOST</div>
+                      </div>
+                      {series.format === 'test' && (
+                        <div>
+                          <div className="text-2xl font-bold text-gray-400">{draws}</div>
+                          <div className="text-xs text-gray-400">DRAW</div>
+                        </div>
+                      )}
+                      <div>
+                        <div className="text-2xl font-bold text-gray-300">{series.matches - seriesMatches.filter(m => m.status === 'completed').length}</div>
+                        <div className="text-xs text-gray-400">TO PLAY</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Match List */}
+                  <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                    {Array.from({ length: series.matches }, (_, i) => i + 1).map(matchNum => {
+                      const matchId = `intl-${series.id}-${matchNum}`;
+                      const match = fixtures.find(f => f.id === matchId);
+
+                      return (
+                        <div
+                          key={matchNum}
+                          className={`rounded-lg p-4 border ${
+                            match?.status === 'completed'
+                              ? 'bg-gray-700/50 border-gray-600'
+                              : match?.status === 'upcoming'
+                              ? 'bg-blue-900/30 border-blue-700'
+                              : 'bg-gray-800/50 border-gray-700 border-dashed'
+                          }`}
+                        >
+                          <div className="flex justify-between items-center mb-2">
+                            <span className="text-sm font-medium">
+                              {matchNum === 1 ? '1st' : matchNum === 2 ? '2nd' : matchNum === 3 ? '3rd' : `${matchNum}th`} {FORMAT_LABELS[series.format]}
+                            </span>
+                            <span className={`text-xs px-2 py-1 rounded ${
+                              match?.status === 'completed' ? 'bg-gray-600 text-gray-300' :
+                              match?.status === 'upcoming' ? 'bg-blue-600 text-white' :
+                              'bg-gray-700 text-gray-400'
+                            }`}>
+                              {match?.status === 'completed' ? 'Completed' :
+                               match?.status === 'upcoming' ? 'Ready to Play' :
+                               'Not Started'}
+                            </span>
+                          </div>
+
+                          {match?.status === 'completed' && match.innings1 && match.innings2 && (() => {
+                            const inn1 = match.innings1;
+                            const inn2 = match.innings2;
+                            const playerBattedFirst = inn1.battingTeam === playerTeamId;
+                            const playerRuns = playerBattedFirst ? inn1.runs : inn2.runs;
+                            const playerWickets = playerBattedFirst ? inn1.wickets : inn2.wickets;
+                            const playerOvers = playerBattedFirst ? inn1.overs : inn2.overs;
+                            const oppRuns = playerBattedFirst ? inn2.runs : inn1.runs;
+                            const oppWickets = playerBattedFirst ? inn2.wickets : inn1.wickets;
+                            const oppOvers = playerBattedFirst ? inn2.overs : inn1.overs;
+
+                            const playerWon = playerBattedFirst
+                              ? inn1.runs > inn2.runs
+                              : inn2.runs > inn1.runs;
+                            const isDraw = inn1.runs === inn2.runs;
+
+                            return (
+                              <div>
+                                <div className="flex items-center justify-between text-sm mb-2">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-lg">{countryConfig?.flag}</span>
+                                    <span className={playerWon ? 'text-green-400 font-medium' : ''}>
+                                      {playerRuns}/{playerWickets} ({playerOvers} ov)
+                                    </span>
+                                  </div>
+                                  <span className="text-gray-500">vs</span>
+                                  <div className="flex items-center gap-2">
+                                    <span className={!playerWon && !isDraw ? 'text-green-400 font-medium' : ''}>
+                                      {oppRuns}/{oppWickets} ({oppOvers} ov)
+                                    </span>
+                                    <span className="text-lg">{opponentConfig?.flag}</span>
+                                  </div>
+                                </div>
+                                <div className="text-center">
+                                  <span className={`text-xs ${playerWon ? 'text-green-400' : isDraw ? 'text-gray-400' : 'text-red-400'}`}>
+                                    {playerWon ? 'Won by ' : isDraw ? 'Match Drawn' : 'Lost by '}
+                                    {!isDraw && (playerBattedFirst
+                                      ? `${inn1.runs - inn2.runs} runs`
+                                      : `${10 - inn2.wickets} wickets`)}
+                                  </span>
+                                </div>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setShowScorecard(match.id);
+                                  }}
+                                  className="mt-2 w-full py-2 bg-gray-600 hover:bg-gray-500 rounded text-xs font-medium transition-colors"
+                                >
+                                  View Full Scorecard
+                                </button>
+                              </div>
+                            );
+                          })()}
+
+                          {match?.status === 'upcoming' && (
+                            <div className="text-center text-sm text-blue-300">
+                              Match ready to play from Home screen
+                            </div>
+                          )}
+
+                          {!match && (
+                            <div className="text-center text-sm text-gray-500">
+                              Complete previous matches to unlock
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Modal Footer */}
+                  <div className="p-4 border-t border-gray-700">
+                    <button
+                      onClick={() => setSelectedSeriesId(null)}
+                      className="w-full py-2 bg-gray-700 hover:bg-gray-600 rounded-lg font-medium transition-colors"
+                    >
+                      Close
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
         </div>
       </div>
     );
@@ -344,16 +547,16 @@ export const ScheduleScreen = () => {
   });
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white pb-24">
+    <div className="min-h-screen bg-gray-900 text-white pb-24 lg:pb-4">
       {/* Header */}
       <header className="bg-gray-800 p-4 border-b border-gray-700">
-        <div className="max-w-lg mx-auto">
-          <h1 className="text-xl font-bold">Schedule</h1>
+        <div className="max-w-lg md:max-w-3xl lg:max-w-5xl mx-auto">
+          <h1 className="text-xl md:text-2xl font-bold">Schedule</h1>
           <p className="text-sm text-gray-400">{playerTeam?.name}</p>
         </div>
       </header>
 
-      <div className="max-w-lg mx-auto p-4 space-y-4">
+      <div className="max-w-lg md:max-w-3xl lg:max-w-5xl mx-auto p-4 md:p-6 space-y-4">
         {/* Filter Tabs */}
         <div className="flex gap-2 overflow-x-auto pb-2">
           {(['your', 'all', 'upcoming', 'completed'] as Filter[]).map((f) => (
@@ -433,11 +636,12 @@ export const ScheduleScreen = () => {
         </details>
 
         {/* Fixtures List */}
-        <div className="space-y-3">
+        <div>
           {sortedFixtures.length === 0 ? (
             <div className="text-center text-gray-500 py-8">No matches found</div>
           ) : (
-            sortedFixtures.map((match) => {
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {sortedFixtures.map((match) => {
               const homeTeam = teams.find((t) => t.id === match.homeTeam);
               const awayTeam = teams.find((t) => t.id === match.awayTeam);
               const isPlayerMatch = match.homeTeam === playerTeamId || match.awayTeam === playerTeamId;
@@ -627,7 +831,8 @@ export const ScheduleScreen = () => {
                   )}
                 </div>
               );
-            })
+            })}
+            </div>
           )}
         </div>
 

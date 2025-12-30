@@ -54,6 +54,7 @@ export const AuctionScreen = () => {
     pickSquadFillPlayer,
     autoFillPlayerSquad,
     completeSquadFill,
+    openPlayerModal,
   } = useGameStore();
 
   const [showRetentionModal, setShowRetentionModal] = useState(false);
@@ -415,14 +416,14 @@ export const AuctionScreen = () => {
                       !teamState.retentions.some((r) => r.playerId === p.id)
                   )
                   .map((player) => (
-                    <button
+                    <div
                       key={player.id}
                       onClick={() => {
                         setRetention(player.id, selectedSlot);
                         setShowRetentionModal(false);
                         setSelectedSlot(null);
                       }}
-                      className="w-full bg-gray-700 hover:bg-gray-600 rounded-lg p-3 flex items-center gap-3 text-left"
+                      className="w-full bg-gray-700 hover:bg-gray-600 rounded-lg p-3 flex items-center gap-3 text-left cursor-pointer"
                     >
                       <div
                         className={`w-10 h-10 rounded-full ${roleColors[player.role]} flex items-center justify-center text-xs font-bold`}
@@ -430,7 +431,15 @@ export const AuctionScreen = () => {
                         {player.shortName.slice(0, 2)}
                       </div>
                       <div className="flex-1">
-                        <div className="font-medium">{player.name}</div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openPlayerModal(player.id, false);
+                          }}
+                          className="font-medium hover:text-blue-400 hover:underline transition-colors"
+                        >
+                          {player.name}
+                        </button>
                         <div className="text-xs text-gray-400">
                           {player.role} • {player.nationality}
                         </div>
@@ -440,7 +449,7 @@ export const AuctionScreen = () => {
                           OS
                         </span>
                       )}
-                    </button>
+                    </div>
                   ))}
               </div>
               <div className="p-4 border-t border-gray-700">

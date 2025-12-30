@@ -8,6 +8,9 @@ import { LEAGUES, LeagueTeam, getAllLeagues } from '../data/leagues';
 import { COUNTRIES, getAllCountries } from '../data/countries';
 import { generateInternationalCalendar } from '../data/internationalCalendar';
 
+// Feature flags - International mode enabled as BETA
+const ENABLE_INTERNATIONAL_MODE = true;
+
 type SetupStep = 'welcome' | 'mode-select' | 'league-select' | 'country-select' | 'team-select' | 'final-setup';
 
 export const StartScreen = () => {
@@ -259,25 +262,48 @@ export const StartScreen = () => {
                 </div>
               </button>
 
-              <div
-                className="p-6 rounded-xl border-2 border-gray-600 bg-gray-700/20 text-left opacity-60 cursor-not-allowed relative"
-              >
-                <div className="absolute top-2 right-2 bg-yellow-600 text-yellow-100 text-xs px-2 py-1 rounded-full font-bold">
-                  COMING SOON
-                </div>
-                <div className="flex items-center gap-4">
-                  <div className="text-4xl grayscale">&#127759;</div>
-                  <div>
-                    <div className="font-bold text-xl mb-1 text-gray-400">International Mode</div>
-                    <div className="text-sm text-gray-500">
-                      Lead a national team across all formats. T20I, ODI, and Test cricket.
+              {ENABLE_INTERNATIONAL_MODE ? (
+                <button
+                  onClick={() => handleModeSelect('international')}
+                  className="p-6 rounded-xl border-2 border-gray-600 hover:border-green-500 bg-gray-700/20 text-left transition-all w-full relative"
+                >
+                  <div className="absolute top-2 right-2 bg-green-600 text-green-100 text-xs px-2 py-1 rounded-full font-bold">
+                    BETA
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <div className="text-4xl">&#127759;</div>
+                    <div>
+                      <div className="font-bold text-xl mb-1">International Mode</div>
+                      <div className="text-sm text-gray-400">
+                        Lead a national team across all formats. T20I, ODI, and Test cricket.
+                      </div>
+                      <div className="text-xs text-green-400 mt-2">
+                        12 Full Member nations
+                      </div>
                     </div>
-                    <div className="text-xs text-gray-600 mt-2">
-                      12 Full Member nations
+                  </div>
+                </button>
+              ) : (
+                <div
+                  className="p-6 rounded-xl border-2 border-gray-600 bg-gray-700/20 text-left opacity-60 cursor-not-allowed relative"
+                >
+                  <div className="absolute top-2 right-2 bg-yellow-600 text-yellow-100 text-xs px-2 py-1 rounded-full font-bold">
+                    COMING SOON
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <div className="text-4xl grayscale">&#127759;</div>
+                    <div>
+                      <div className="font-bold text-xl mb-1 text-gray-400">International Mode</div>
+                      <div className="text-sm text-gray-500">
+                        Lead a national team across all formats. T20I, ODI, and Test cricket.
+                      </div>
+                      <div className="text-xs text-gray-600 mt-2">
+                        12 Full Member nations
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
         )}
@@ -330,28 +356,32 @@ export const StartScreen = () => {
             </div>
 
             <div className="grid grid-cols-2 gap-3 max-h-80 overflow-y-auto">
-              {getAllCountries().map((country) => (
-                <button
-                  key={country.id}
-                  onClick={() => handleCountrySelect(country.id)}
-                  className={`p-3 rounded-lg border-2 transition-all text-left ${
-                    country.id === 'IND'
-                      ? 'border-gray-600 hover:border-green-500 bg-gray-700/50'
-                      : 'border-gray-700 hover:border-gray-500 bg-gray-700/30 opacity-60'
-                  }`}
-                  disabled={country.id !== 'IND'}
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="text-2xl">{country.flag}</span>
-                    <div>
-                      <div className="font-semibold text-sm">{country.name}</div>
-                      {country.id !== 'IND' && (
-                        <div className="text-xs text-gray-500">Coming Soon</div>
-                      )}
+              {getAllCountries().map((country) => {
+                // With the feature flag, all countries are enabled
+                const isEnabled = ENABLE_INTERNATIONAL_MODE || country.id === 'IND';
+                return (
+                  <button
+                    key={country.id}
+                    onClick={() => handleCountrySelect(country.id)}
+                    className={`p-3 rounded-lg border-2 transition-all text-left ${
+                      isEnabled
+                        ? 'border-gray-600 hover:border-green-500 bg-gray-700/50'
+                        : 'border-gray-700 hover:border-gray-500 bg-gray-700/30 opacity-60'
+                    }`}
+                    disabled={!isEnabled}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="text-2xl">{country.flag}</span>
+                      <div>
+                        <div className="font-semibold text-sm">{country.name}</div>
+                        {!isEnabled && (
+                          <div className="text-xs text-gray-500">Coming Soon</div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                </button>
-              ))}
+                  </button>
+                );
+              })}
             </div>
           </div>
         )}

@@ -1,8 +1,9 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { PlayerCard } from '../components/PlayerCard';
-import { Player, MatchTactics, TacticalApproach, PlayerInstruction, BattingInstruction, BowlingInstruction, BowlingLength, FieldSetting, BowlingApproach } from '../types';
+import { Player, MatchTactics, TacticalApproach, PlayerInstruction, BattingInstruction, BowlingInstruction, BowlingLength, FieldSetting, BowlingApproach, MatchFormat } from '../types';
 import { COUNTRIES } from '../data/countries';
+import { getFormatConfig } from '../engine/matchEngine';
 
 type Step = 'select' | 'tactics' | 'review';
 
@@ -50,6 +51,8 @@ export const MatchPrepScreen = () => {
 
   const [step, setStep] = useState<Step>('select');
   const [selectedPlayers, setSelectedPlayers] = useState<string[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [roleFilter, setRoleFilter] = useState<'all' | 'batsman' | 'bowler' | 'allrounder' | 'keeper'>('all');
   const [battingApproach, setBattingApproach] = useState({
     powerplay: 'aggressive' as TacticalApproach,
     middle: 'balanced' as TacticalApproach,
@@ -78,6 +81,42 @@ export const MatchPrepScreen = () => {
     ? teams.find((t) => t.id === (match.homeTeam === playerTeamId ? match.awayTeam : match.homeTeam))
     : null;
 
+  // Get format-specific configuration
+  const matchFormat: MatchFormat = match?.format || 't20';
+  const formatConfig = getFormatConfig(matchFormat);
+
+  // Get format-aware phase labels
+  const getPhaseLabel = (phase: 'powerplay' | 'middle' | 'death'): string => {
+    if (matchFormat === 'test') {
+      switch (phase) {
+        case 'powerplay': return 'New Ball (1-10)';
+        case 'middle': return 'Middle Session (11-80)';
+        case 'death': return 'Late Overs (80+)';
+      }
+    } else if (matchFormat === 'odi') {
+      switch (phase) {
+        case 'powerplay': return 'Powerplay (1-10)';
+        case 'middle': return 'Middle Overs (11-40)';
+        case 'death': return 'Death (41-50)';
+      }
+    }
+    // T20 default
+    switch (phase) {
+      case 'powerplay': return 'Powerplay (1-6)';
+      case 'middle': return 'Middle Overs (7-15)';
+      case 'death': return 'Death (16-20)';
+    }
+  };
+
+  const getFormatLabel = (): string => {
+    switch (matchFormat) {
+      case 'test': return 'Test Match';
+      case 'odi': return 'One Day International';
+      case 't20': return 'T20';
+      default: return 'Match';
+    }
+  };
+
   // Prevent replaying completed or in-progress matches
   useEffect(() => {
     if (match && match.status !== 'upcoming') {
@@ -105,6 +144,26 @@ export const MatchPrepScreen = () => {
     }).length,
     [selectedPlayers, players]
   );
+
+  // Filter available players based on search and role
+  const filteredAvailablePlayers = useMemo(() => {
+    return teamPlayers
+      .filter((p) => !selectedPlayers.includes(p.id))
+      .filter((p) => {
+        // Search filter - match name or short name
+        if (searchQuery) {
+          const query = searchQuery.toLowerCase();
+          return p.name.toLowerCase().includes(query) ||
+                 p.shortName.toLowerCase().includes(query);
+        }
+        return true;
+      })
+      .filter((p) => {
+        // Role filter
+        if (roleFilter === 'all') return true;
+        return p.role === roleFilter;
+      });
+  }, [teamPlayers, selectedPlayers, searchQuery, roleFilter]);
 
   // Helper functions for player instructions
   const getPlayerInstruction = (playerId: string): PlayerInstruction => {
@@ -501,11 +560,52 @@ export const MatchPrepScreen = () => {
 
             {/* Available players */}
             <div>
-              <h3 className="text-sm text-gray-400 mb-2">Available Players</h3>
-              <div className="space-y-2">
-                {teamPlayers
-                  .filter((p) => !selectedPlayers.includes(p.id))
-                  .map((player) => (
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-sm text-gray-400">Available Players ({filteredAvailablePlayers.length})</h3>
+              </div>
+
+              {/* Search and Filters */}
+              <div className="space-y-2 mb-3">
+                {/* Search Input */}
+                <input
+                  type="text"
+                  placeholder="Search players..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-sm text-white placeholder-gray-400 focus:outline-none focus:border-blue-500"
+                />
+
+                {/* Role Filter Buttons */}
+                <div className="flex gap-1 flex-wrap">
+                  {(['all', 'batsman', 'keeper', 'allrounder', 'bowler'] as const).map((role) => (
+                    <button
+                      key={role}
+                      onClick={() => setRoleFilter(role)}
+                      className={`px-3 py-1 text-xs rounded-full transition-colors ${
+                        roleFilter === role
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                      }`}
+                    >
+                      {role === 'all' ? 'All' : role.charAt(0).toUpperCase() + role.slice(1)}
+                      {role !== 'all' && (
+                        <span className="ml-1 text-gray-400">
+                          ({teamPlayers.filter(p => !selectedPlayers.includes(p.id) && p.role === role).length})
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Player List */}
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {filteredAvailablePlayers.length === 0 ? (
+                  <div className="text-center py-4 text-gray-500 text-sm">
+                    {searchQuery ? 'No players match your search' : 'No players available'}
+                  </div>
+                ) : (
+                  filteredAvailablePlayers.map((player) => (
                     <PlayerCard
                       key={player.id}
                       player={player}
@@ -513,7 +613,8 @@ export const MatchPrepScreen = () => {
                       compact
                       selected={false}
                     />
-                  ))}
+                  ))
+                )}
               </div>
             </div>
 
@@ -553,10 +654,11 @@ export const MatchPrepScreen = () => {
             {tacticsTab === 'batting' && (
               <>
                 <h2 className="text-lg font-semibold">Batting Approach</h2>
+                <p className="text-sm text-gray-400 -mt-2 mb-2">{getFormatLabel()} • {formatConfig.totalOvers} overs</p>
                 {(['powerplay', 'middle', 'death'] as const).map((phase) => (
                   <div key={phase} className="bg-gray-800 rounded-xl p-4 border border-gray-700">
-                    <h3 className="text-sm text-gray-400 mb-3 capitalize">
-                      {phase === 'powerplay' ? 'Powerplay (1-6)' : phase === 'middle' ? 'Middle Overs (7-15)' : 'Death (16-20)'}
+                    <h3 className="text-sm text-gray-400 mb-3">
+                      {getPhaseLabel(phase)}
                     </h3>
                     <div className="flex gap-2">
                       {(['aggressive', 'balanced', 'cautious'] as TacticalApproach[]).map((approach) => (
@@ -582,10 +684,11 @@ export const MatchPrepScreen = () => {
             {tacticsTab === 'bowling' && (
               <>
                 <h2 className="text-lg font-semibold">Bowling Tactics</h2>
+                <p className="text-sm text-gray-400 -mt-2 mb-2">{getFormatLabel()} • Max {formatConfig.maxOversPerBowler} overs/bowler</p>
                 {(['powerplay', 'middle', 'death'] as const).map((phase) => (
                   <div key={phase} className="bg-gray-800 rounded-xl p-4 border border-gray-700">
                     <h3 className="text-sm text-gray-400 mb-3">
-                      {phase === 'powerplay' ? 'Powerplay (1-6)' : phase === 'middle' ? 'Middle Overs (7-15)' : 'Death (16-20)'}
+                      {getPhaseLabel(phase)}
                     </h3>
 
                     {/* Bowling Length */}

@@ -2,7 +2,7 @@
  * Match Service - Backend API integration with client-side fallback
  */
 
-import { apiPost, getBackendStatus } from './client';
+import { apiPost, getBackendStatus, isOffline } from './client';
 import {
   ApiSimulateBallRequest,
   ApiSimulateBallResponse,
@@ -46,6 +46,7 @@ import type {
 // ============================================
 
 let useBackendSimulation = true;
+let hasLoggedFallbackWarning = false; // Only log fallback warning once per session
 
 export function setUseBackend(use: boolean): void {
   useBackendSimulation = use;
@@ -107,8 +108,9 @@ export async function simulateBall(
 
   const phase: MatchPhase = getPhase(Math.floor(inningsState.overs));
 
-  // Try backend first if enabled
-  if (useBackendSimulation) {
+  // Try backend first if enabled AND we're not in offline mode
+  // Skip entirely if offline to avoid console spam from failed POST requests
+  if (useBackendSimulation && !isOffline()) {
     try {
       const request: ApiSimulateBallRequest = {
         innings_state: toApiInningsState(inningsState),
@@ -148,9 +150,15 @@ export async function simulateBall(
       }
 
       // API call failed, fall through to client fallback
-      console.warn('Backend simulation failed, using client fallback:', result.error);
-    } catch (error) {
-      console.warn('Backend simulation error, using client fallback:', error);
+      if (!hasLoggedFallbackWarning) {
+        console.warn('Backend unavailable, using client simulation (this message appears once)');
+        hasLoggedFallbackWarning = true;
+      }
+    } catch {
+      if (!hasLoggedFallbackWarning) {
+        console.warn('Backend unavailable, using client simulation (this message appears once)');
+        hasLoggedFallbackWarning = true;
+      }
     }
   }
 
@@ -206,6 +214,9 @@ export interface SimulateOverParams {
   target: number | null;
   bowlingLength?: BowlingLength;
   fieldSetting?: FieldSetting;
+  // Format-specific parameters (defaults to T20 for backwards compatibility)
+  totalOvers?: number;
+  maxOversPerBowler?: number;
 }
 
 export interface OverSimulationResult {
@@ -233,12 +244,15 @@ export async function simulateOver(
     target,
     bowlingLength,
     fieldSetting,
+    totalOvers = 20,  // Default to T20 for backwards compatibility
+    maxOversPerBowler = 4,
   } = params;
 
-  const phase: MatchPhase = getPhase(Math.floor(inningsState.overs));
+  const phase: MatchPhase = getPhase(Math.floor(inningsState.overs), totalOvers);
 
-  // Try backend first if enabled
-  if (useBackendSimulation) {
+  // Try backend first if enabled AND we're not in offline mode
+  // Skip entirely if offline to avoid console spam from failed POST requests
+  if (useBackendSimulation && !isOffline()) {
     try {
       const request: ApiSimulateOverRequest = {
         innings_state: toApiInningsState(inningsState),
@@ -271,25 +285,33 @@ export async function simulateOver(
         };
       }
 
-      console.warn('Backend simulation failed, using client fallback:', result.error);
-    } catch (error) {
-      console.warn('Backend simulation error, using client fallback:', error);
+      if (!hasLoggedFallbackWarning) {
+        console.warn('Backend unavailable, using client simulation (this message appears once)');
+        hasLoggedFallbackWarning = true;
+      }
+    } catch {
+      if (!hasLoggedFallbackWarning) {
+        console.warn('Backend unavailable, using client simulation (this message appears once)');
+        hasLoggedFallbackWarning = true;
+      }
     }
   }
 
-  // Client-side fallback
+  // Client-side fallback (pass format-specific overs)
   const { overSummary, updatedInnings } = clientSimulateOver(
     battingTeam,
     bowler,
     inningsState,
     tactics,
     pitch,
-    target
+    target,
+    totalOvers,
+    maxOversPerBowler
   );
 
-  // Check if innings is complete
+  // Check if innings is complete (use format-specific total overs)
   const inningsComplete = updatedInnings.wickets >= 10 ||
-                          Math.floor(updatedInnings.overs) >= 20 ||
+                          Math.floor(updatedInnings.overs) >= totalOvers ||
                           (target !== null && updatedInnings.runs >= target);
 
   // Get recommended next bowler from client engine
@@ -300,7 +322,8 @@ export async function simulateOver(
   const recommendedBowler = clientSelectSmartBowler(
     availableBowlers,
     updatedInnings,
-    lastBowlerId
+    lastBowlerId,
+    maxOversPerBowler
   );
 
   return {

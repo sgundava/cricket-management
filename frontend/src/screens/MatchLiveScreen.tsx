@@ -90,6 +90,7 @@ export const MatchLiveScreen = () => {
   const [liveBowlingLength, setLiveBowlingLength] = useState<BowlingLength | null>(null);
   const [liveFieldSetting, setLiveFieldSetting] = useState<FieldSetting | null>(null);
   const [showScorecard, setShowScorecard] = useState(false);
+  const [showManhattan, setShowManhattan] = useState(false);
 
   const match = fixtures.find((m) => m.id === selectedMatchId);
 
@@ -338,7 +339,12 @@ export const MatchLiveScreen = () => {
       return;
     }
 
-    const target = currentInnings === 2 ? firstInningsTotal + 1 : null;
+    // Target calculation:
+    // - T20/ODI innings 2: chase the first innings total
+    // - Test innings 1-3: no target (bat until all out)
+    // - Test innings 4: chase the lead (handled separately in test4thInningsChaseComplete)
+    const isTestFormat = match.format === 'test';
+    const target = (!isTestFormat && currentInnings === 2) ? firstInningsTotal + 1 : null;
 
     // Get batting team in correct batting order (as per playingXI)
     const battingTeamInOrder = battingTactics.playingXI
@@ -349,6 +355,7 @@ export const MatchLiveScreen = () => {
     let overSummary: OverSummary;
     let updatedInnings: InningsState;
 
+    // Use the service which handles backend/client fallback internally
     try {
       const result = await backendSimulateOver({
         battingTeam: battingTeamInOrder,
@@ -360,34 +367,35 @@ export const MatchLiveScreen = () => {
         target,
         bowlingLength: liveBowlingLength ?? undefined,
         fieldSetting: liveFieldSetting ?? undefined,
+        totalOvers: formatConfig.totalOvers,
+        maxOversPerBowler: formatConfig.maxOversPerBowler,
       });
 
       overSummary = result.overSummary;
       updatedInnings = result.updatedInnings;
     } catch (error) {
-      // Fallback to client simulation
-      console.warn('Backend simulation failed, using client:', error);
-      const clientResult = clientSimulateOver(
-        battingTeamInOrder,
-        bowler,
-        inningsState,
-        battingTactics,
-        match.pitch,
-        target,
-        formatConfig.totalOvers,
-        formatConfig.maxOversPerBowler
-      );
-      overSummary = clientResult.overSummary;
-      updatedInnings = clientResult.updatedInnings;
+      console.error('Simulation failed:', error);
+      setIsLoading(false);
+      return;
     }
 
     setIsLoading(false);
+
+    // Debug: log the state update
+    console.log('[DEBUG] Over simulation result:', {
+      overNumber: overSummary.overNumber,
+      runsScored: overSummary.runs,
+      newOvers: updatedInnings.overs,
+      newBalls: updatedInnings.balls,
+      newRuns: updatedInnings.runs,
+      newWickets: updatedInnings.wickets,
+    });
 
     setLastOver(overSummary);
     setInningsState(updatedInnings);
 
     // Check innings end conditions based on format
-    const isTestFormat = match.format === 'test';
+    // isTestFormat already defined above for target calculation
     const totalInnings = isTestFormat ? 4 : 2;
 
     // For Test: innings ends on all out only (or declaration - not implemented yet)
@@ -1155,10 +1163,10 @@ export const MatchLiveScreen = () => {
     : null;
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white pb-24">
+    <div className="min-h-screen bg-gray-900 text-white pb-24 lg:pb-4">
       {/* Header */}
       <header className="bg-gray-800 p-4 border-b border-gray-700">
-        <div className="max-w-lg mx-auto flex justify-between items-center">
+        <div className="max-w-lg md:max-w-3xl lg:max-w-6xl mx-auto flex justify-between items-center">
           <div className="flex items-center gap-2">
             <span className="animate-pulse bg-red-600 text-xs px-2 py-1 rounded">LIVE</span>
             <span className="text-sm text-gray-400">
@@ -1173,9 +1181,89 @@ export const MatchLiveScreen = () => {
         </div>
       </header>
 
-      <div className="max-w-lg mx-auto p-4 space-y-4">
+      <div className="max-w-lg md:max-w-3xl lg:max-w-6xl mx-auto p-4 md:p-6">
+        {/* Desktop: 3-column grid layout */}
+        <div className="lg:grid lg:grid-cols-12 lg:gap-6">
+
+        {/* Left Column (Desktop): Batting Info - hidden on mobile, shown on lg */}
+        <div className="hidden lg:block lg:col-span-3 space-y-4">
+          {/* Current Batters - Desktop Sidebar */}
+          {striker && (
+            <div className="bg-gray-800 rounded-xl p-4 border border-gray-700">
+              <h3 className="text-sm text-gray-400 mb-3">AT THE CREASE</h3>
+              <div className="space-y-3">
+                {(() => {
+                  const batterStatsMap = inningsState?.batterStats;
+                  const strikerStats = batterStatsMap instanceof Map
+                    ? batterStatsMap.get(striker.id)
+                    : undefined;
+                  const runs = strikerStats?.runs ?? 0;
+                  const balls = strikerStats?.balls ?? 0;
+                  const fours = strikerStats?.fours ?? 0;
+                  const sixes = strikerStats?.sixes ?? 0;
+                  const sr = balls > 0 ? ((runs / balls) * 100).toFixed(1) : '0.0';
+                  return (
+                    <div className="bg-gray-700/50 rounded-lg p-3">
+                      <div className="font-medium text-blue-400">{striker.shortName}*</div>
+                      <div className="text-2xl font-bold">{runs}<span className="text-gray-400 text-sm"> ({balls})</span></div>
+                      <div className="text-xs text-gray-500">SR: {sr}</div>
+                      {(fours > 0 || sixes > 0) && (
+                        <div className="text-xs mt-1">
+                          {fours > 0 && <span className="text-blue-400">{fours}×4</span>}
+                          {fours > 0 && sixes > 0 && ' '}
+                          {sixes > 0 && <span className="text-green-400">{sixes}×6</span>}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+                {nonStriker && (() => {
+                  const batterStatsMap = inningsState?.batterStats;
+                  const nonStrikerStats = batterStatsMap instanceof Map
+                    ? batterStatsMap.get(nonStriker.id)
+                    : undefined;
+                  const runs = nonStrikerStats?.runs ?? 0;
+                  const balls = nonStrikerStats?.balls ?? 0;
+                  return (
+                    <div className="text-gray-400 text-sm">
+                      <span>{nonStriker.shortName}</span>
+                      <span className="ml-2">{runs} ({balls})</span>
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+          )}
+
+          {/* Current Bowler - Desktop Sidebar */}
+          {inningsState?.currentBowler && (() => {
+            const currentBowler = players.find((p) => p.id === inningsState.currentBowler);
+            const bowlerStatsMap = inningsState.bowlerStats;
+            const bowlerStats = bowlerStatsMap instanceof Map
+              ? bowlerStatsMap.get(inningsState.currentBowler)
+              : undefined;
+            if (!currentBowler) return null;
+            const overs = bowlerStats?.overs ?? 0;
+            const runsGiven = bowlerStats?.runs ?? 0;
+            const wicketsTaken = bowlerStats?.wickets ?? 0;
+            const economy = overs > 0 ? (runsGiven / overs).toFixed(2) : '0.00';
+            const maxOvers = getFormatConfig(match.format || 't20').maxOversPerBowler;
+            return (
+              <div className="bg-gray-800 rounded-xl p-4 border border-gray-700">
+                <h3 className="text-sm text-gray-400 mb-2">BOWLING</h3>
+                <div className="font-medium text-purple-400">{currentBowler.shortName}</div>
+                <div className="text-xl font-bold">{wicketsTaken}-{runsGiven}</div>
+                <div className="text-xs text-gray-500">{overs}/{maxOvers} ov • Econ: {economy}</div>
+              </div>
+            );
+          })()}
+        </div>
+
+        {/* Center Column: Main Score & Controls */}
+        <div className="lg:col-span-6 space-y-4">
+
         {/* Score Card */}
-        <div className="bg-gray-800 rounded-xl p-4 border border-gray-700 text-center">
+        <div className="bg-gray-800 rounded-xl p-4 md:p-6 border border-gray-700 text-center">
           <h2 className="text-lg text-gray-400 mb-2">
             {battingTeamDisplayName || 'Team'} Batting
           </h2>
@@ -1269,9 +1357,9 @@ export const MatchLiveScreen = () => {
           })()}
         </div>
 
-        {/* Current Batters */}
+        {/* Current Batters - Mobile/Tablet only */}
         {striker && (
-          <div className="bg-gray-800 rounded-xl p-4 border border-gray-700">
+          <div className="lg:hidden bg-gray-800 rounded-xl p-4 border border-gray-700">
             <h3 className="text-sm text-gray-400 mb-3">AT THE CREASE</h3>
             <div className="space-y-2">
               {(() => {
@@ -1303,7 +1391,7 @@ export const MatchLiveScreen = () => {
                   </div>
                 );
               })()}
-              {nonStriker && (() => {
+              {nonStriker ? (() => {
                 const batterStatsMap = inningsState?.batterStats;
                 const nonStrikerStats = batterStatsMap instanceof Map
                   ? batterStatsMap.get(nonStriker.id)
@@ -1330,12 +1418,16 @@ export const MatchLiveScreen = () => {
                     </div>
                   </div>
                 );
-              })()}
+              })() : (
+                <div className="flex justify-between items-center text-gray-500">
+                  <span className="italic">Awaiting partner...</span>
+                </div>
+              )}
             </div>
           </div>
         )}
 
-        {/* Current Bowler */}
+        {/* Current Bowler - Mobile/Tablet only */}
         {inningsState?.currentBowler && (() => {
           const currentBowler = players.find((p) => p.id === inningsState.currentBowler);
           // Safely get bowler stats (bowlerStats might be a Map or plain object after JSON deserialization)
@@ -1349,8 +1441,9 @@ export const MatchLiveScreen = () => {
           const wicketsTaken = bowlerStats?.wickets ?? 0;
           const dots = bowlerStats?.dots ?? 0;
           const economy = overs > 0 ? (runsGiven / overs).toFixed(2) : '0.00';
+          const maxOvers = getFormatConfig(match.format || 't20').maxOversPerBowler;
           return (
-            <div className="bg-gray-800 rounded-xl p-3 border border-gray-700">
+            <div className="lg:hidden bg-gray-800 rounded-xl p-3 border border-gray-700">
               <div className="flex justify-between items-center">
                 <div>
                   <span className="text-sm text-gray-400">BOWLING: </span>
@@ -1358,7 +1451,7 @@ export const MatchLiveScreen = () => {
                 </div>
                 <div className="text-right">
                   <span className="font-bold">{wicketsTaken}-{runsGiven}</span>
-                  <span className="text-gray-400 text-sm"> ({overs}/4 ov)</span>
+                  <span className="text-gray-400 text-sm"> ({overs}/{maxOvers} ov)</span>
                   <span className="text-gray-500 text-xs ml-2">Econ: {economy}</span>
                   <span className="text-gray-500 text-xs ml-2">Dots: {dots}</span>
                 </div>
@@ -1516,7 +1609,8 @@ export const MatchLiveScreen = () => {
                     if (!stats || stats.overs === 0) return null;
 
                     const economy = stats.overs > 0 ? (stats.runs / stats.overs).toFixed(1) : '-';
-                    const isMaxedOut = stats.overs >= 4;
+                    const maxOversForFormat = getFormatConfig(match.format || 't20').maxOversPerBowler;
+                    const isMaxedOut = stats.overs >= maxOversForFormat;
 
                     return (
                       <div
@@ -1633,6 +1727,120 @@ export const MatchLiveScreen = () => {
           )}
         </div>
 
+        {/* Manhattan Chart Toggle - Only for limited overs */}
+        {match?.format !== 'test' && inningsState && inningsState.overSummaries.length > 0 && (
+          <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
+            <button
+              onClick={() => setShowManhattan(!showManhattan)}
+              className="w-full p-3 flex justify-between items-center text-left hover:bg-gray-700/50 transition-colors"
+            >
+              <span className="text-sm font-medium text-gray-300">📊 Manhattan Chart</span>
+              <span className="text-gray-500 text-xs">{showManhattan ? '▼' : '▶'}</span>
+            </button>
+
+            {showManhattan && (
+              <div className="p-4 border-t border-gray-700">
+                {/* Run Rate Summary */}
+                <div className="flex justify-between text-xs text-gray-400 mb-3">
+                  <span>Overs: {inningsState.overs}</span>
+                  <span>Run Rate: {inningsState.overs > 0 ? (inningsState.runs / inningsState.overs).toFixed(2) : '0.00'}</span>
+                  {match?.format === 't20' && inningsState.overs > 0 && (
+                    <span>Proj: {Math.round((inningsState.runs / inningsState.overs) * 20)}</span>
+                  )}
+                  {match?.format === 'odi' && inningsState.overs > 0 && (
+                    <span>Proj: {Math.round((inningsState.runs / inningsState.overs) * 50)}</span>
+                  )}
+                </div>
+
+                {/* Manhattan Bars */}
+                <div className="flex items-end gap-0.5 h-24 overflow-x-auto pb-2">
+                  {inningsState.overSummaries.map((over, idx) => {
+                    const maxRuns = Math.max(...inningsState.overSummaries.map(o => o.runs), 12);
+                    const height = Math.max(4, (over.runs / maxRuns) * 100);
+                    const isWicket = over.wickets > 0;
+
+                    return (
+                      <div key={idx} className="flex flex-col items-center min-w-[16px]">
+                        <div
+                          className={`w-3 rounded-t transition-all ${
+                            isWicket
+                              ? 'bg-red-500'
+                              : over.runs >= 10
+                              ? 'bg-green-500'
+                              : over.runs >= 6
+                              ? 'bg-blue-500'
+                              : 'bg-gray-600'
+                          }`}
+                          style={{ height: `${height}%` }}
+                          title={`Over ${over.overNumber + 1}: ${over.runs} runs${isWicket ? `, ${over.wickets} wkt` : ''}`}
+                        />
+                        <span className="text-[8px] text-gray-500 mt-1">{over.overNumber + 1}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Legend */}
+                <div className="flex justify-center gap-4 mt-2 text-[10px] text-gray-500">
+                  <span className="flex items-center gap-1">
+                    <span className="w-2 h-2 bg-green-500 rounded"></span> 10+ runs
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <span className="w-2 h-2 bg-blue-500 rounded"></span> 6-9 runs
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <span className="w-2 h-2 bg-red-500 rounded"></span> Wicket
+                  </span>
+                </div>
+
+                {/* Phase Breakdown */}
+                {inningsState.overSummaries.length >= 6 && (
+                  <div className="mt-3 pt-3 border-t border-gray-700">
+                    <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                      {(() => {
+                        const powerplay = inningsState.overSummaries.slice(0, 6);
+                        const middle = match?.format === 't20'
+                          ? inningsState.overSummaries.slice(6, 15)
+                          : inningsState.overSummaries.slice(10, 40);
+                        const death = match?.format === 't20'
+                          ? inningsState.overSummaries.slice(15)
+                          : inningsState.overSummaries.slice(40);
+
+                        const ppRuns = powerplay.reduce((sum, o) => sum + o.runs, 0);
+                        const ppWkts = powerplay.reduce((sum, o) => sum + o.wickets, 0);
+                        const midRuns = middle.reduce((sum, o) => sum + o.runs, 0);
+                        const midWkts = middle.reduce((sum, o) => sum + o.wickets, 0);
+                        const deathRuns = death.reduce((sum, o) => sum + o.runs, 0);
+                        const deathWkts = death.reduce((sum, o) => sum + o.wickets, 0);
+
+                        return (
+                          <>
+                            <div className="bg-gray-700/50 rounded p-2">
+                              <div className="text-gray-400 text-[10px]">Powerplay</div>
+                              <div className="font-medium">{ppRuns}/{ppWkts}</div>
+                              <div className="text-gray-500 text-[10px]">RR: {powerplay.length > 0 ? (ppRuns / powerplay.length).toFixed(1) : '-'}</div>
+                            </div>
+                            <div className="bg-gray-700/50 rounded p-2">
+                              <div className="text-gray-400 text-[10px]">Middle</div>
+                              <div className="font-medium">{midRuns}/{midWkts}</div>
+                              <div className="text-gray-500 text-[10px]">RR: {middle.length > 0 ? (midRuns / middle.length).toFixed(1) : '-'}</div>
+                            </div>
+                            <div className="bg-gray-700/50 rounded p-2">
+                              <div className="text-gray-400 text-[10px]">Death</div>
+                              <div className="font-medium">{deathRuns}/{deathWkts}</div>
+                              <div className="text-gray-500 text-[10px]">RR: {death.length > 0 ? (deathRuns / death.length).toFixed(1) : '-'}</div>
+                            </div>
+                          </>
+                        );
+                      })()}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Tactical Controls Panel */}
         {!matchEnded && showTacticsPanel && (
           <div className="bg-gray-800 rounded-xl p-4 border border-blue-700">
@@ -1706,7 +1914,8 @@ export const MatchLiveScreen = () => {
                   bowlingTactics?.playingXI.includes(p.id)
                 );
               const lastBowlerId = inningsState?.overSummaries.at(-1)?.bowler;
-              const MAX_OVERS = 4; // T20 rule
+              const formatConfig = getFormatConfig(match?.format || 't20');
+              const MAX_OVERS = formatConfig.maxOversPerBowler;
 
               return (
                 <div>
@@ -1967,6 +2176,168 @@ export const MatchLiveScreen = () => {
             </button>
           </div>
         )}
+
+        </div> {/* End Center Column */}
+
+        {/* Right Column (Desktop): Scorecard always visible */}
+        <div className="hidden lg:block lg:col-span-3 space-y-4">
+          {/* Mini Scorecard - Always visible on desktop */}
+          {inningsState && (() => {
+            const battingTactics =
+              inningsState.battingTeam === match?.homeTeam
+                ? match?.homeTactics
+                : match?.awayTactics;
+            const bowlingTeamPlayers =
+              inningsState.bowlingTeam === match?.homeTeam ? homePlayers : awayPlayers;
+            const bowlingTactics =
+              inningsState.bowlingTeam === match?.homeTeam
+                ? match?.homeTactics
+                : match?.awayTactics;
+
+            const battingOrder = battingTactics?.playingXI || [];
+
+            const getBatterStats = (playerId: string) => {
+              if (inningsState.batterStats instanceof Map) {
+                return inningsState.batterStats.get(playerId);
+              } else if (inningsState.batterStats && typeof inningsState.batterStats === 'object') {
+                return (inningsState.batterStats as Record<string, { runs: number; balls: number; fours: number; sixes: number }>)[playerId];
+              }
+              return undefined;
+            };
+
+            const getBowlerStats = (bowlerId: string) => {
+              if (inningsState.bowlerStats instanceof Map) {
+                return inningsState.bowlerStats.get(bowlerId);
+              } else if (inningsState.bowlerStats && typeof inningsState.bowlerStats === 'object') {
+                return (inningsState.bowlerStats as Record<string, { overs: number; runs: number; wickets: number; dots: number }>)[bowlerId];
+              }
+              return undefined;
+            };
+
+            const dismissedBatters = inningsState.fallOfWickets.map(fow => fow.player);
+            const allBowlers = bowlingTeamPlayers.filter(p =>
+              (p.role === 'bowler' || p.role === 'allrounder') &&
+              bowlingTactics?.playingXI.includes(p.id)
+            );
+
+            return (
+              <>
+                {/* Batting Card */}
+                <div className="bg-gray-800 rounded-xl p-4 border border-gray-700">
+                  <h3 className="text-sm font-semibold text-blue-400 mb-3">BATTING</h3>
+                  <div className="space-y-1 text-xs">
+                    {battingOrder.slice(0, 7).map((playerId) => {
+                      const player = players.find(p => p.id === playerId);
+                      const stats = getBatterStats(playerId);
+                      const isDismissed = dismissedBatters.includes(playerId);
+                      const isCurrentBatter = inningsState.currentBatters.includes(playerId);
+                      const isStriker = playerId === inningsState.currentBatters[0];
+                      const hasBatted = stats || isCurrentBatter || isDismissed;
+
+                      if (!hasBatted) return null;
+
+                      const runs = stats?.runs ?? 0;
+                      const balls = stats?.balls ?? 0;
+
+                      return (
+                        <div
+                          key={playerId}
+                          className={`flex justify-between ${
+                            isDismissed ? 'text-gray-500' : isCurrentBatter ? 'text-white' : 'text-gray-400'
+                          }`}
+                        >
+                          <span className="truncate max-w-[100px]">
+                            {player?.shortName}{isStriker && '*'}
+                          </span>
+                          <span>{runs} ({balls})</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Bowling Card */}
+                <div className="bg-gray-800 rounded-xl p-4 border border-gray-700">
+                  <h3 className="text-sm font-semibold text-purple-400 mb-3">BOWLING</h3>
+                  <div className="space-y-1 text-xs">
+                    {allBowlers.map((bowler) => {
+                      const stats = getBowlerStats(bowler.id);
+                      if (!stats || stats.overs === 0) return null;
+
+                      return (
+                        <div key={bowler.id} className="flex justify-between text-gray-300">
+                          <span className="truncate max-w-[100px]">{bowler.shortName}</span>
+                          <span>{stats.wickets}-{stats.runs} ({stats.overs})</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Partnerships */}
+                <div className="bg-gray-800 rounded-xl p-4 border border-gray-700">
+                  <h3 className="text-sm font-semibold text-green-400 mb-2">PARTNERSHIPS</h3>
+                  <div className="text-xs space-y-1 max-h-32 overflow-y-auto">
+                    {(() => {
+                      const partnerships: { wicket: number; runs: number; current: boolean }[] = [];
+                      const fow = inningsState.fallOfWickets;
+
+                      // Calculate past partnerships
+                      fow.forEach((f, idx) => {
+                        const prevRuns = idx === 0 ? 0 : fow[idx - 1].runs;
+                        partnerships.push({
+                          wicket: idx + 1,
+                          runs: f.runs - prevRuns,
+                          current: false,
+                        });
+                      });
+
+                      // Current partnership
+                      const lastFowRuns = fow.length > 0 ? fow[fow.length - 1].runs : 0;
+                      const currentPartnership = inningsState.runs - lastFowRuns;
+                      if (currentPartnership > 0 || fow.length === 0) {
+                        partnerships.push({
+                          wicket: fow.length + 1,
+                          runs: currentPartnership,
+                          current: true,
+                        });
+                      }
+
+                      return partnerships.map((p, idx) => (
+                        <div
+                          key={idx}
+                          className={`flex justify-between ${p.current ? 'text-green-400 font-medium' : 'text-gray-400'}`}
+                        >
+                          <span>{p.wicket === 1 ? '1st' : p.wicket === 2 ? '2nd' : p.wicket === 3 ? '3rd' : `${p.wicket}th`} wkt</span>
+                          <span>{p.runs} runs{p.current ? '*' : ''}</span>
+                        </div>
+                      ));
+                    })()}
+                  </div>
+                </div>
+
+                {/* Fall of Wickets */}
+                {inningsState.fallOfWickets.length > 0 && (
+                  <div className="bg-gray-800 rounded-xl p-4 border border-gray-700">
+                    <h3 className="text-sm font-semibold text-red-400 mb-2">FALL OF WICKETS</h3>
+                    <div className="text-xs text-gray-400 space-y-1 max-h-32 overflow-y-auto">
+                      {inningsState.fallOfWickets.map((fow, idx) => {
+                        const player = players.find(p => p.id === fow.player);
+                        return (
+                          <div key={idx}>
+                            {fow.runs}/{idx + 1} ({player?.shortName}, {fow.overs} ov)
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </>
+            );
+          })()}
+        </div>
+
+        </div> {/* End Grid */}
       </div>
     </div>
   );

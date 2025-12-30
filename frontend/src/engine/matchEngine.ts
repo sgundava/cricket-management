@@ -999,7 +999,8 @@ export const simulateSingleBall = (
     undefined, // bowlingTactics
     undefined, // teamFielding
     strikerBallsFaced,
-    matchContext
+    matchContext,
+    totalOvers
   );
 
   // Create ball event
@@ -1165,6 +1166,9 @@ export const simulateOver = (
   // Track balls faced during this over (added to existing stats)
   const overBallsFaced: Map<string, number> = new Map();
 
+  // Track batters dismissed during THIS over (to prevent re-selection)
+  const dismissedThisOver: Set<string> = new Set();
+
   // Calculate initial match context (will be updated as wickets fall)
   let matchContext = calculateMatchContext(inningsState, bowler.id);
 
@@ -1201,7 +1205,8 @@ export const simulateOver = (
       undefined, // bowlingTactics
       undefined, // teamFielding
       strikerBallsFaced,
-      updatedContext
+      updatedContext,
+      totalOvers
     );
 
     // Update balls faced for this striker during the over
@@ -1224,6 +1229,9 @@ export const simulateOver = (
       wickets++;
       runs += outcome.runs;
 
+      // Track the dismissed batter to prevent re-selection in this over
+      dismissedThisOver.add(striker.id);
+
       // Reset partnership runs in match context after wicket
       matchContext = {
         ...matchContext,
@@ -1231,9 +1239,11 @@ export const simulateOver = (
         recentWickets: matchContext.recentWickets + 1,
       };
 
-      // Get next batter
+      // Get next batter - exclude: current batters, already dismissed (start of over), AND dismissed this over
       const nextBatter = availableBatters.find(
-        (p) => !currentBatters.includes(p.id) && !inningsState.fallOfWickets.some((f) => f.player === p.id)
+        (p) => !currentBatters.includes(p.id) &&
+               !inningsState.fallOfWickets.some((f) => f.player === p.id) &&
+               !dismissedThisOver.has(p.id)
       );
 
       if (nextBatter && inningsState.wickets + wickets < 10) {
@@ -1465,11 +1475,16 @@ export const simulateMatch = (
   awayTeamPlayers: Player[],
   match: Match
 ): MatchResult => {
-  const { homeTactics, awayTactics, pitch } = match;
+  const { homeTactics, awayTactics, pitch, format = 't20' } = match;
 
   if (!homeTactics || !awayTactics) {
     throw new Error('Both teams must have tactics set');
   }
+
+  // Get format-specific configuration
+  const formatConfig = FORMAT_CONFIGS[format];
+  const totalOvers = formatConfig.totalOvers;
+  const maxOversPerBowler = formatConfig.maxOversPerBowler;
 
   // Toss
   const tossWinner = Math.random() < 0.5 ? 'home' : 'away';
@@ -1498,7 +1513,9 @@ export const simulateMatch = (
     bowlingFirst,
     battingFirstTactics,
     pitch,
-    null
+    null,
+    totalOvers,
+    maxOversPerBowler
   );
 
   // Second innings
@@ -1508,7 +1525,9 @@ export const simulateMatch = (
     battingFirst,
     bowlingFirstTactics,
     pitch,
-    target
+    target,
+    totalOvers,
+    maxOversPerBowler
   );
 
   // Determine winner
@@ -1631,6 +1650,37 @@ const getBowlerRole = (bowler: Player): BowlerRole => {
   return 'middle';
 };
 
+// Calculate recent spell length for a bowler (consecutive overs in recent history)
+const getRecentSpellLength = (bowlerId: string, overSummaries: OverSummary[]): number => {
+  if (overSummaries.length === 0) return 0;
+
+  let spellLength = 0;
+  // Look at the last 20 overs to find recent spell
+  const recentOvers = overSummaries.slice(-20);
+
+  // Count consecutive overs by this bowler at the end
+  for (let i = recentOvers.length - 1; i >= 0; i--) {
+    if (recentOvers[i].bowler === bowlerId) {
+      spellLength++;
+    } else if (spellLength > 0) {
+      // Spell broken, but check if they had a recent spell (within last 5 overs)
+      break;
+    }
+  }
+
+  return spellLength;
+};
+
+// Calculate how many overs since this bowler last bowled (for rest tracking)
+const getOversSinceLastBowled = (bowlerId: string, overSummaries: OverSummary[]): number => {
+  for (let i = overSummaries.length - 1; i >= 0; i--) {
+    if (overSummaries[i].bowler === bowlerId) {
+      return overSummaries.length - 1 - i;
+    }
+  }
+  return 999; // Never bowled
+};
+
 // Select the best bowler based on match context
 export const selectSmartBowler = (
   availableBowlers: Player[],
@@ -1640,6 +1690,13 @@ export const selectSmartBowler = (
 ): Player | null => {
   const currentOver = inningsState.overs;
   const phase = getPhase(currentOver);
+
+  // Determine format-based spell limits
+  // Test cricket: typical spell is 4-8 overs, then rest
+  // Limited overs: can bowl continuous spells up to max (4 in T20, 10 in ODI)
+  const isLongFormat = maxOvers > 10;
+  const maxSpellLength = isLongFormat ? 8 : maxOvers; // Test: 8 over max spell, then rotate
+  const minRestOvers = isLongFormat ? 4 : 1; // Test: need 4 overs rest after a spell
 
   // Filter out last bowler and those who've bowled max overs
   const eligibleBowlers = availableBowlers.filter(b => {
@@ -1670,6 +1727,34 @@ export const selectSmartBowler = (
     // Calculate selection score
     let score = 50; // Base score
 
+    // SPELL MANAGEMENT (important for Test cricket)
+    const recentSpell = getRecentSpellLength(bowler.id, inningsState.overSummaries);
+    const oversSinceLastBowled = getOversSinceLastBowled(bowler.id, inningsState.overSummaries);
+
+    if (isLongFormat) {
+      // For Test cricket, enforce spell rotation
+      if (recentSpell >= maxSpellLength) {
+        // Bowler has bowled a full spell - needs rest
+        score -= 50; // Heavy penalty
+      } else if (recentSpell >= maxSpellLength - 2) {
+        // Approaching spell limit
+        score -= 20;
+      }
+
+      // Bonus for well-rested bowlers
+      if (oversSinceLastBowled >= minRestOvers && overs > 0) {
+        score += 15; // Fresh after rest
+      }
+
+      // Encourage variety - bowlers who haven't bowled much get a bonus
+      const shareOfOvers = overs / Math.max(1, currentOver);
+      if (shareOfOvers < 0.15) {
+        score += 20; // Underutilized bowler
+      } else if (shareOfOvers > 0.35) {
+        score -= 15; // Overworked bowler
+      }
+    }
+
     // IPL-derived phase matching using spell patterns
     // Pace bowlers: 50% PP, 27% middle, 23% death
     // Spin bowlers: 23% PP, 66% middle, 11% death
@@ -1689,29 +1774,33 @@ export const selectSmartBowler = (
       if (phase === 'death' && role === 'death') score += 25;
     }
 
-    // Hot bowler bonus (partnership breaker)
+    // Hot bowler bonus (partnership breaker) - reduced for long formats
     if (isHot) {
-      score += 30; // Bring back the wicket-taker
+      score += isLongFormat ? 15 : 30; // Less aggressive in Tests
     }
 
-    // Economy penalty/bonus (if has bowled)
+    // Economy penalty/bonus (if has bowled) - adjusted thresholds for format
     if (overs >= 1) {
-      if (economy < 6) score += 15;
-      else if (economy < 8) score += 5;
-      else if (economy > 10) score -= 10;
-      else if (economy > 12) score -= 20;
+      const economyThresholds = isLongFormat
+        ? { excellent: 2.5, good: 3.5, bad: 4.5, terrible: 5.5 }
+        : { excellent: 6, good: 8, bad: 10, terrible: 12 };
+
+      if (economy < economyThresholds.excellent) score += 15;
+      else if (economy < economyThresholds.good) score += 5;
+      else if (economy > economyThresholds.bad) score -= 10;
+      else if (economy > economyThresholds.terrible) score -= 20;
     }
 
     // Wickets in this innings bonus
     score += wickets * 8;
 
     // Fresh bowler slight bonus (variety)
-    if (overs === 0) score += 5;
+    if (overs === 0) score += 10;
 
     // Overs remaining consideration (spread workload)
     const oversRemaining = maxOvers - overs;
-    if (oversRemaining <= 1 && phase !== 'death') {
-      score -= 10; // Save last over for death if possible
+    if (!isLongFormat && oversRemaining <= 1 && phase !== 'death') {
+      score -= 10; // Save last over for death if possible (limited overs only)
     }
 
     // Skill-based adjustment
@@ -1720,6 +1809,11 @@ export const selectSmartBowler = (
 
     // Form adjustment
     score += bowler.form * 0.5;
+
+    // Fatigue penalty for high workload in Test matches
+    if (isLongFormat && overs > 20) {
+      score -= (overs - 20) * 0.5; // Fatigue penalty after 20 overs
+    }
 
     return { bowler, role, score, overs, economy, wickets, isHot };
   });

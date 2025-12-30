@@ -28,12 +28,51 @@ export type ApiResult<T> = ApiResponse<T> | ApiErrorResponse;
  */
 let isBackendConnected = false;
 let lastHealthCheck = 0;
-const HEALTH_CHECK_INTERVAL = 30000; // 30 seconds
+let consecutiveFailures = 0;
+let offlineModeEnabled = false; // User chose to play offline - skip all backend calls
+const HEALTH_CHECK_INTERVAL_ONLINE = 30000; // 30 seconds when online
+const HEALTH_CHECK_INTERVAL_OFFLINE = 60000; // 60 seconds when offline (reduce console spam)
+
+/**
+ * Enable offline mode - skips all backend calls until re-enabled
+ */
+export function setOfflineMode(enabled: boolean): void {
+  offlineModeEnabled = enabled;
+  if (enabled) {
+    isBackendConnected = false;
+  }
+}
+
+/**
+ * Check if we're in offline mode (either forced or detected)
+ */
+export function isOffline(): boolean {
+  return offlineModeEnabled || !isBackendConnected;
+}
+
+/**
+ * Check if offline mode was explicitly enabled by user
+ */
+export function isOfflineModeEnabled(): boolean {
+  return offlineModeEnabled;
+}
 
 /**
  * Check if backend is available
+ * Uses exponential backoff when offline to reduce console spam
  */
 export async function checkBackendHealth(): Promise<boolean> {
+  // If user enabled offline mode, don't even try to check
+  if (offlineModeEnabled) {
+    return false;
+  }
+
+  // Skip check if we recently confirmed offline (reduce network error spam)
+  const minInterval = isBackendConnected ? HEALTH_CHECK_INTERVAL_ONLINE : HEALTH_CHECK_INTERVAL_OFFLINE;
+  if (lastHealthCheck > 0 && Date.now() - lastHealthCheck < minInterval) {
+    return isBackendConnected;
+  }
+
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 3000);
@@ -45,10 +84,14 @@ export async function checkBackendHealth(): Promise<boolean> {
 
     isBackendConnected = response.ok;
     lastHealthCheck = Date.now();
+    if (response.ok) {
+      consecutiveFailures = 0;
+    }
     return isBackendConnected;
   } catch {
     isBackendConnected = false;
     lastHealthCheck = Date.now();
+    consecutiveFailures++;
     return false;
   }
 }
@@ -67,7 +110,8 @@ export function getBackendStatus(): { connected: boolean; lastCheck: number } {
  * Should we check health again?
  */
 export function shouldRefreshHealth(): boolean {
-  return Date.now() - lastHealthCheck > HEALTH_CHECK_INTERVAL;
+  const interval = isBackendConnected ? HEALTH_CHECK_INTERVAL_ONLINE : HEALTH_CHECK_INTERVAL_OFFLINE;
+  return Date.now() - lastHealthCheck > interval;
 }
 
 /**

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useGameStore } from '../store/gameStore';
 import { formatSaveDate } from '../utils/saveManager';
-import { checkBackendHealth, getBackendStatus } from '../services/api/client';
+import { checkBackendHealth, getBackendStatus, setOfflineMode, isOfflineModeEnabled } from '../services/api/client';
 
 export const GlobalMenu = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -15,21 +15,37 @@ export const GlobalMenu = () => {
 
   // Backend connection status
   const [backendConnected, setBackendConnected] = useState(false);
-  const [lastChecked, setLastChecked] = useState<Date | null>(null);
+  const [offlineMode, setOfflineModeState] = useState(isOfflineModeEnabled());
 
-  // Check backend health on mount and periodically
+  // Check backend health on mount and periodically (skip if offline mode enabled)
   useEffect(() => {
+    if (offlineMode) return; // Don't poll when offline mode is enabled
+
     const checkConnection = async () => {
       await checkBackendHealth();
       const status = getBackendStatus();
       setBackendConnected(status.connected);
-      setLastChecked(new Date());
     };
 
     checkConnection();
     const interval = setInterval(checkConnection, 30000); // Check every 30s
     return () => clearInterval(interval);
-  }, []);
+  }, [offlineMode]);
+
+  const handleEnableOfflineMode = () => {
+    setOfflineMode(true);
+    setOfflineModeState(true);
+    setBackendConnected(false);
+  };
+
+  const handleDisableOfflineMode = async () => {
+    setOfflineMode(false);
+    setOfflineModeState(false);
+    // Try to reconnect
+    await checkBackendHealth();
+    const status = getBackendStatus();
+    setBackendConnected(status.connected);
+  };
 
   const {
     initialized,
@@ -208,23 +224,41 @@ export const GlobalMenu = () => {
                     {backendConnected ? 'Backend Connected' : 'Offline Mode'}
                   </span>
                 </div>
-                <button
-                  onClick={async () => {
-                    await checkBackendHealth();
-                    const status = getBackendStatus();
-                    setBackendConnected(status.connected);
-                    setLastChecked(new Date());
-                  }}
-                  className="text-xs text-gray-500 hover:text-gray-300 px-2 py-1 rounded bg-gray-800/50"
-                >
-                  Refresh
-                </button>
+                {offlineMode ? (
+                  <button
+                    onClick={handleDisableOfflineMode}
+                    className="text-xs text-blue-400 hover:text-blue-300 px-2 py-1 rounded bg-blue-900/30"
+                  >
+                    Go Online
+                  </button>
+                ) : (
+                  <button
+                    onClick={async () => {
+                      await checkBackendHealth();
+                      const status = getBackendStatus();
+                      setBackendConnected(status.connected);
+                    }}
+                    className="text-xs text-gray-500 hover:text-gray-300 px-2 py-1 rounded bg-gray-800/50"
+                  >
+                    Refresh
+                  </button>
+                )}
               </div>
               <p className="text-xs text-gray-500 mt-1">
-                {backendConnected
-                  ? 'Using server for match & event simulation'
-                  : 'Using local engine (start backend for full features)'}
+                {offlineMode
+                  ? 'Playing offline - no backend requests'
+                  : backendConnected
+                    ? 'Using server for match & event simulation'
+                    : 'Backend not available - click below to play offline'}
               </p>
+              {!backendConnected && !offlineMode && (
+                <button
+                  onClick={handleEnableOfflineMode}
+                  className="mt-2 w-full text-xs bg-amber-800/50 hover:bg-amber-700/50 text-amber-300 py-1.5 px-3 rounded"
+                >
+                  Play Offline (stops connection attempts)
+                </button>
+              )}
             </div>
 
             {/* Current Status */}

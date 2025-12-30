@@ -59,13 +59,13 @@ export const SquadScreen = () => {
     };
 
     return (
-      <div className="min-h-screen bg-gray-900 text-white pb-24">
+      <div className="min-h-screen bg-gray-900 text-white pb-24 lg:pb-4">
         {/* Header */}
         <header className="bg-gradient-to-r from-blue-900 to-indigo-900 p-4 border-b border-blue-700 sticky top-0 z-10">
-          <div className="max-w-lg mx-auto">
+          <div className="max-w-lg md:max-w-3xl lg:max-w-5xl mx-auto">
             <div className="flex items-center gap-2 mb-2">
               <span className="text-2xl">{countryConfig?.flag}</span>
-              <h1 className="text-xl font-bold">National Squad</h1>
+              <h1 className="text-xl md:text-2xl font-bold">National Squad</h1>
             </div>
             <div className="flex gap-3 text-sm text-blue-300">
               <span>{nationalPool.length} players in pool</span>
@@ -74,10 +74,10 @@ export const SquadScreen = () => {
         </header>
 
         {/* Squad Summary */}
-        <div className="max-w-lg mx-auto p-4">
+        <div className="max-w-lg md:max-w-3xl lg:max-w-5xl mx-auto p-4 md:p-6">
           <div className="bg-gray-800 rounded-xl p-4 border border-gray-700 mb-4">
             <h3 className="text-sm font-semibold text-gray-400 mb-3">SQUAD COMPOSITION</h3>
-            <div className="grid grid-cols-4 gap-2 text-center">
+            <div className="grid grid-cols-4 gap-2 md:gap-4 text-center">
               <div className="bg-orange-900/30 rounded-lg p-2">
                 <div className="text-lg font-bold text-orange-400">
                   {nationalPool.filter(p => p.role === 'batsman').length}
@@ -107,8 +107,8 @@ export const SquadScreen = () => {
         </div>
 
         {/* Filters */}
-        <div className="max-w-lg mx-auto px-4 sticky top-[88px] bg-gray-900 z-10 pb-2">
-          <div className="flex gap-2 overflow-x-auto pb-2">
+        <div className="max-w-lg md:max-w-3xl lg:max-w-5xl mx-auto px-4 md:px-6 sticky top-[88px] bg-gray-900 z-10 pb-2">
+          <div className="flex flex-wrap gap-2 pb-2">
             {(['all', 'batsman', 'keeper', 'allrounder', 'bowler'] as FilterOption[]).map((filter) => (
               <button
                 key={filter}
@@ -140,7 +140,7 @@ export const SquadScreen = () => {
         </div>
 
         {/* Player List */}
-        <div className="max-w-lg mx-auto px-4 space-y-6">
+        <div className="max-w-lg md:max-w-3xl lg:max-w-5xl mx-auto px-4 md:px-6 space-y-6">
           {filterBy === 'all' ? (
             // Show grouped by role
             Object.entries(groupedPlayers).map(([role, rolePlayers]) => (
@@ -149,7 +149,7 @@ export const SquadScreen = () => {
                   <h2 className="text-sm font-semibold text-gray-400 mb-3 uppercase">
                     {role === 'keeper' ? 'Wicketkeepers' : role + 's'}
                   </h2>
-                  <div className="space-y-2">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                     {rolePlayers.map((player) => (
                       <PlayerCard
                         key={player.id}
@@ -164,7 +164,7 @@ export const SquadScreen = () => {
             ))
           ) : (
             // Show flat list
-            <div className="space-y-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
               {sortedPool.map((player) => (
                 <PlayerCard
                   key={player.id}
@@ -219,11 +219,11 @@ export const SquadScreen = () => {
   const overseasCount = teamPlayers.filter((p) => p.contract.isOverseas).length;
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white pb-24">
+    <div className="min-h-screen bg-gray-900 text-white pb-24 lg:pb-4">
       {/* Header */}
       <header className="bg-gray-800 p-4 border-b border-gray-700 sticky top-0 z-10">
-        <div className="max-w-lg mx-auto">
-          <h1 className="text-xl font-bold mb-2">Squad</h1>
+        <div className="max-w-lg md:max-w-3xl lg:max-w-5xl mx-auto">
+          <h1 className="text-xl md:text-2xl font-bold mb-2">Squad</h1>
 
           <div className="flex gap-2 text-sm text-gray-400">
             <span>{teamPlayers.length} players</span>
@@ -234,8 +234,8 @@ export const SquadScreen = () => {
       </header>
 
       {/* Filters */}
-      <div className="max-w-lg mx-auto p-4 sticky top-[72px] bg-gray-900 z-10">
-        <div className="flex gap-2 overflow-x-auto pb-2">
+      <div className="max-w-lg md:max-w-3xl lg:max-w-5xl mx-auto p-4 md:p-6 sticky top-[72px] bg-gray-900 z-10">
+        <div className="flex flex-wrap gap-2 pb-2">
           {(['all', 'batsman', 'keeper', 'allrounder', 'bowler'] as FilterOption[]).map((filter) => (
             <button
               key={filter}
@@ -266,7 +266,7 @@ export const SquadScreen = () => {
       </div>
 
       {/* Player List */}
-      <div className="max-w-lg mx-auto px-4 space-y-6">
+      <div className="max-w-lg md:max-w-3xl lg:max-w-5xl mx-auto px-4 md:px-6 space-y-6">
         {filterBy === 'all' ? (
           // Show grouped by role
           Object.entries(groupedPlayers).map(([role, rolePlayers]) => (
@@ -275,7 +275,7 @@ export const SquadScreen = () => {
                 <h2 className="text-sm font-semibold text-gray-400 mb-3 uppercase">
                   {role === 'keeper' ? 'Wicketkeepers' : role + 's'}
                 </h2>
-                <div className="space-y-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                   {rolePlayers.map((player) => (
                     <PlayerCard
                       key={player.id}
@@ -290,7 +290,7 @@ export const SquadScreen = () => {
           ))
         ) : (
           // Show flat list
-          <div className="space-y-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {sortedPlayers.map((player) => (
               <PlayerCard
                 key={player.id}

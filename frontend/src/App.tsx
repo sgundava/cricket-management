@@ -116,7 +116,10 @@ function App() {
       <div className="min-h-screen bg-gray-900">
         <GlobalMenu />
         <DebugButton />
-        {renderScreen()}
+        {/* Main content area - shifts right on desktop when nav is visible */}
+        <div className={showNav ? 'lg:ml-20' : ''}>
+          {renderScreen()}
+        </div>
         {showNav && <NavBar />}
         <ModalContainer allowStacking={allowStacking} />
       </div>

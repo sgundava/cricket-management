@@ -1,5 +1,6 @@
 import { useGameStore } from '../store/gameStore';
 import { StatBar } from '../components/StatBar';
+import { COUNTRIES } from '../data/countries';
 
 export const ClubScreen = () => {
   const {
@@ -12,10 +13,137 @@ export const ClubScreen = () => {
     pointsTable,
     navigateTo,
     canHoldTeamMeeting,
+    gameMode,
+    country,
+    internationalCalendar,
   } = useGameStore();
 
   const canMeet = canHoldTeamMeeting();
 
+  // International Mode - Show national team management view
+  if (gameMode === 'international' && country) {
+    const countryConfig = COUNTRIES[country];
+    const nationalPlayers = players.filter(p => p.nationality === countryConfig?.name);
+
+    // Calculate averages for national pool
+    const avgMorale = nationalPlayers.length
+      ? Math.round(nationalPlayers.reduce((sum, p) => sum + p.morale, 0) / nationalPlayers.length)
+      : 0;
+    const avgFitness = nationalPlayers.length
+      ? Math.round(nationalPlayers.reduce((sum, p) => sum + p.fitness, 0) / nationalPlayers.length)
+      : 0;
+
+    // Count series results
+    const allSeries = internationalCalendar?.series || [];
+    const completedSeries = allSeries.filter(s => {
+      const matchesPlayed = fixtures.filter(f => f.id.includes(s.id)).length;
+      return matchesPlayed >= s.matches;
+    });
+
+    return (
+      <div className="min-h-screen bg-gray-900 text-white pb-24 lg:pb-4">
+        {/* Header */}
+        <header className="bg-gradient-to-r from-blue-900 to-indigo-900 p-4 border-b border-blue-700">
+          <div className="max-w-lg md:max-w-3xl lg:max-w-5xl mx-auto flex items-center gap-4">
+            <div className="text-4xl">{countryConfig?.flag}</div>
+            <div>
+              <h1 className="text-xl md:text-2xl font-bold">{countryConfig?.name} Cricket Board</h1>
+              <p className="text-sm text-blue-300">Head Coach: {manager.name}</p>
+            </div>
+          </div>
+        </header>
+
+        <div className="max-w-lg md:max-w-3xl lg:max-w-5xl mx-auto p-4 md:p-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+          {/* ICC Rankings */}
+          <div className="bg-gray-800 rounded-xl p-4 border border-gray-700">
+            <h2 className="text-sm font-semibold text-gray-400 mb-3">ICC RANKINGS</h2>
+            <div className="grid grid-cols-3 gap-4 text-center">
+              <div>
+                <div className="text-2xl font-bold text-blue-400">#{countryConfig?.iccRanking.t20}</div>
+                <div className="text-xs text-gray-400">T20I</div>
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-green-400">#{countryConfig?.iccRanking.odi}</div>
+                <div className="text-xs text-gray-400">ODI</div>
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-purple-400">
+                  {countryConfig?.iccRanking.test ? `#${countryConfig.iccRanking.test}` : 'N/A'}
+                </div>
+                <div className="text-xs text-gray-400">Test</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Season Record */}
+          <div className="bg-gray-800 rounded-xl p-4 border border-gray-700">
+            <h2 className="text-sm font-semibold text-gray-400 mb-3">SEASON RECORD</h2>
+            <div className="grid grid-cols-4 gap-2 text-center">
+              <div>
+                <div className="text-xl font-bold text-blue-400">{manager.history.testSeriesWon}</div>
+                <div className="text-xs text-gray-500">Test W</div>
+              </div>
+              <div>
+                <div className="text-xl font-bold text-green-400">{manager.history.odiSeriesWon}</div>
+                <div className="text-xs text-gray-500">ODI W</div>
+              </div>
+              <div>
+                <div className="text-xl font-bold text-purple-400">{manager.history.t20SeriesWon}</div>
+                <div className="text-xs text-gray-500">T20 W</div>
+              </div>
+              <div>
+                <div className="text-xl font-bold text-yellow-400">{manager.history.iccEventsWon}</div>
+                <div className="text-xs text-gray-500">ICC</div>
+              </div>
+            </div>
+            <div className="mt-3 pt-3 border-t border-gray-700">
+              <div className="text-sm text-gray-400 text-center">
+                Series Completed: {completedSeries.length} / {allSeries.length}
+              </div>
+            </div>
+          </div>
+
+          {/* Squad Overview */}
+          <div className="bg-gray-800 rounded-xl p-4 border border-gray-700">
+            <h2 className="text-sm font-semibold text-gray-400 mb-3">NATIONAL SQUAD</h2>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <StatBar label="Avg Morale" value={avgMorale} color="green" />
+              </div>
+              <div>
+                <StatBar label="Avg Fitness" value={avgFitness} color="blue" />
+              </div>
+            </div>
+            <div className="mt-4 flex justify-between text-sm">
+              <span className="text-gray-400">Player Pool</span>
+              <span className="font-medium">{nationalPlayers.length} Players</span>
+            </div>
+          </div>
+
+          {/* Manager */}
+          <div className="bg-gray-800 rounded-xl p-4 border border-gray-700">
+            <h2 className="text-sm font-semibold text-gray-400 mb-3">HEAD COACH</h2>
+            <div className="flex items-center gap-4">
+              <div className="text-3xl">👤</div>
+              <div>
+                <div className="font-bold">{manager.name}</div>
+                <div className="text-sm text-gray-400">
+                  International Reputation: {manager.reputation.international}
+                </div>
+              </div>
+            </div>
+            <div className="mt-3 pt-3 border-t border-gray-700">
+              <StatBar label="Reputation" value={manager.reputation.international} color="blue" />
+            </div>
+          </div>
+          </div> {/* End grid */}
+        </div>
+      </div>
+    );
+  }
+
+  // Franchise Mode
   const playerTeam = teams.find((t) => t.id === playerTeamId);
   const teamPlayers = players.filter((p) => playerTeam?.squad.includes(p.id));
 
@@ -70,10 +198,10 @@ export const ClubScreen = () => {
   const totalSalary = teamPlayers.reduce((sum, p) => sum + p.contract.salary, 0);
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white pb-24">
+    <div className="min-h-screen bg-gray-900 text-white pb-24 lg:pb-4">
       {/* Header */}
       <header className="bg-gray-800 p-4 border-b border-gray-700">
-        <div className="max-w-lg mx-auto flex items-center gap-4">
+        <div className="max-w-lg md:max-w-3xl lg:max-w-5xl mx-auto flex items-center gap-4">
           <div
             className="w-16 h-16 rounded-full flex items-center justify-center text-xl font-bold"
             style={{ backgroundColor: playerTeam?.colors.primary }}
@@ -81,13 +209,14 @@ export const ClubScreen = () => {
             {playerTeam?.shortName}
           </div>
           <div>
-            <h1 className="text-xl font-bold">{playerTeam?.name}</h1>
+            <h1 className="text-xl md:text-2xl font-bold">{playerTeam?.name}</h1>
             <p className="text-sm text-gray-400">Manager: {manager.name}</p>
           </div>
         </div>
       </header>
 
-      <div className="max-w-lg mx-auto p-4 space-y-4">
+      <div className="max-w-lg md:max-w-3xl lg:max-w-5xl mx-auto p-4 md:p-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
         {/* Season Performance */}
         <div className="bg-gray-800 rounded-xl p-4 border border-gray-700">
           <h2 className="text-sm font-semibold text-gray-400 mb-3">SEASON PERFORMANCE</h2>
@@ -295,8 +424,8 @@ export const ClubScreen = () => {
           </div>
         </div>
 
-        {/* Team Actions */}
-        <div className="bg-gray-800 rounded-xl p-4 border border-gray-700">
+        {/* Team Actions - full width */}
+        <div className="md:col-span-2 bg-gray-800 rounded-xl p-4 border border-gray-700">
           <h2 className="text-sm font-semibold text-gray-400 mb-3">TEAM ACTIONS</h2>
 
           <button
@@ -322,11 +451,12 @@ export const ClubScreen = () => {
           </button>
         </div>
 
-        {/* Coming Soon: Staff */}
-        <div className="bg-gray-700/30 rounded-xl p-4 border border-dashed border-gray-600 text-center">
+        {/* Coming Soon: Staff - full width */}
+        <div className="md:col-span-2 bg-gray-700/30 rounded-xl p-4 border border-dashed border-gray-600 text-center">
           <div className="text-gray-500 text-sm">Staff Management</div>
           <div className="text-gray-600 text-xs mt-1">Coming Soon</div>
         </div>
+        </div> {/* End grid */}
       </div>
     </div>
   );
