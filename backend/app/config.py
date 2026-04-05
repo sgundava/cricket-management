@@ -4,6 +4,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import List
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings
 
 
@@ -29,6 +30,20 @@ class Settings(BaseSettings):
 
     # Match engine
     event_trigger_chance: float = 0.35  # 35% chance to trigger event after match
+
+    @field_validator("debug", mode="before")
+    @classmethod
+    def parse_debug_mode(cls, value):
+        """Accept both booleans and common mode strings from local shells/hosts."""
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, str):
+            normalized = value.strip().lower()
+            if normalized in {"1", "true", "yes", "on", "debug", "development", "dev"}:
+                return True
+            if normalized in {"0", "false", "no", "off", "release", "production", "prod"}:
+                return False
+        return value
 
     class Config:
         env_file = ".env"

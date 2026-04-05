@@ -400,6 +400,7 @@ export const MatchLiveScreen = () => {
         fieldSetting: liveFieldSetting ?? undefined,
         totalOvers: formatConfig.totalOvers,
         maxOversPerBowler: formatConfig.maxOversPerBowler,
+        matchFormat: match.format || 't20',
       });
 
       overSummary = result.overSummary;

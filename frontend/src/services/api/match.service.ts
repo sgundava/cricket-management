@@ -39,6 +39,7 @@ import type {
   BowlingLength,
   FieldSetting,
   MatchPhase,
+  MatchFormat,
 } from '../../types';
 
 // ============================================
@@ -72,6 +73,7 @@ export interface SimulateBallParams {
   bowlingLength?: BowlingLength;
   fieldSetting?: FieldSetting;
   ballsFaced?: number;
+  matchFormat?: MatchFormat;
 }
 
 export interface BallSimulationResult {
@@ -104,6 +106,7 @@ export async function simulateBall(
     bowlingLength,
     fieldSetting,
     ballsFaced = 0,
+    matchFormat = 't20',
   } = params;
 
   const phase: MatchPhase = getPhase(Math.floor(inningsState.overs));
@@ -126,6 +129,7 @@ export async function simulateBall(
         pitch_conditions: toApiPitchConditions(pitch),
         target,
         match_phase: getApiMatchPhase(Math.floor(inningsState.overs)),
+        match_format: matchFormat,
         include_narrative: true,
       };
 
@@ -217,6 +221,7 @@ export interface SimulateOverParams {
   // Format-specific parameters (defaults to T20 for backwards compatibility)
   totalOvers?: number;
   maxOversPerBowler?: number;
+  matchFormat?: MatchFormat;
 }
 
 export interface OverSimulationResult {
@@ -246,6 +251,7 @@ export async function simulateOver(
     fieldSetting,
     totalOvers = 20,  // Default to T20 for backwards compatibility
     maxOversPerBowler = 4,
+    matchFormat = 't20',
   } = params;
 
   const phase: MatchPhase = getPhase(Math.floor(inningsState.overs), totalOvers);
@@ -266,6 +272,7 @@ export async function simulateOver(
         ),
         pitch_conditions: toApiPitchConditions(pitch),
         target,
+        match_format: matchFormat,
       };
 
       const result = await apiPost<ApiSimulateOverRequest, ApiSimulateOverResponse>(

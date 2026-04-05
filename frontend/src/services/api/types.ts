@@ -41,6 +41,7 @@ export type ApiDismissalType = 'bowled' | 'caught' | 'lbw' | 'runout' | 'stumped
 export type ApiExtraType = 'wide' | 'noball' | 'bye' | 'legbye';
 export type ApiEventCategory = 'player' | 'media' | 'team' | 'board' | 'season';
 export type ApiRiskLevel = 'safe' | 'moderate' | 'risky';
+export type ApiMatchFormat = 't20' | 'odi' | 'test';
 
 // ============================================
 // PLAYER SCHEMAS
@@ -205,6 +206,7 @@ export interface ApiSimulateBallRequest {
   pitch_conditions: ApiPitchConditions;
   target: number | null;
   match_phase: ApiMatchPhase;
+  match_format?: ApiMatchFormat;
   include_narrative?: boolean;
 }
 
@@ -246,6 +248,7 @@ export interface ApiSimulateOverRequest {
   bowling_tactics: ApiBowlingTactics;
   pitch_conditions: ApiPitchConditions;
   target: number | null;
+  match_format?: ApiMatchFormat;
 }
 
 export interface ApiSimulateOverResponse {
