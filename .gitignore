@@ -27,9 +27,6 @@ npm-debug.log*
 .cache/
 .eslintcache
 
-# Internal docs (all markdown files)
-*.md
-
 # AI/IDE config folders (keep out of version control)
 .ai/
 .claude/
