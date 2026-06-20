@@ -18,13 +18,14 @@ import {
   MatchPrepScreen,
   MatchLiveScreen,
   SeasonSummaryScreen,
+  DevelopmentReportScreen,
   EventScreen,
   AuctionScreen,
   ReleasePhaseScreen,
 } from './screens';
 
 function App() {
-  const { initialized, currentScreen, phase, auctionState, liveMatchState, navigateTo, selectMatch } = useGameStore();
+  const { initialized, currentScreen, phase, auctionState, liveMatchState, lastDevelopmentReport, navigateTo, selectMatch } = useGameStore();
 
   // Track if we've already done initial navigation to prevent loops
   const hasNavigatedRef = useRef(false);
@@ -39,6 +40,14 @@ function App() {
       hasNavigatedRef.current = true;
       selectMatch(liveMatchState.matchId);
       navigateTo('match-live');
+      return;
+    }
+
+    // If in off-season with a fresh development report but no auction started yet,
+    // resume on the development report screen.
+    if (phase === 'off-season' && !auctionState && lastDevelopmentReport?.length) {
+      hasNavigatedRef.current = true;
+      navigateTo('development-report');
       return;
     }
 
@@ -68,7 +77,7 @@ function App() {
   }
 
   // Screens that should hide the nav bar
-  const hideNavScreens = ['match-live', 'match-prep', 'event', 'season-summary', 'player-talk', 'team-meeting', 'auction', 'release-phase'];
+  const hideNavScreens = ['match-live', 'match-prep', 'event', 'season-summary', 'development-report', 'player-talk', 'team-meeting', 'auction', 'release-phase'];
   const showNav = !hideNavScreens.includes(currentScreen);
 
   // Render current screen
@@ -96,6 +105,8 @@ function App() {
         return <MatchLiveScreen />;
       case 'season-summary':
         return <SeasonSummaryScreen />;
+      case 'development-report':
+        return <DevelopmentReportScreen />;
       case 'event':
         return <EventScreen />;
       case 'auction':

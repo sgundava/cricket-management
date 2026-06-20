@@ -92,6 +92,47 @@ export const BOWLING_TACTICS_CONFIG = {
   MAX_BOUNDARY_SAVE_CHANCE: 0.30,
 };
 
+// ============================================
+// PLAYER DEVELOPMENT (season-over-season skill change)
+// ============================================
+// Drives how player skills grow toward their `potential` ceiling when young
+// and decline with age. All values are tunable — the engine reads only from here.
+export const DEVELOPMENT_CONFIG = {
+  // Age bands (inclusive upper bound for each band). 34+ = veteran.
+  YOUTH_MAX_AGE: 23,    // strong growth toward potential
+  PRIME_MAX_AGE: 29,    // plateau / mild growth
+  DECLINE_MAX_AGE: 33,  // gradual decline
+
+  // Growth: fraction of remaining headroom (potential - skill) gained per season.
+  GROWTH: {
+    youth: 0.16,
+    prime: 0.05,
+  },
+
+  // Decline: base skill points lost per season (before the type multiplier).
+  DECLINE: {
+    decline: 2.0,
+    veteran: 4.0,
+  },
+
+  // Physical skills (pace, stamina, athleticism) fade faster than
+  // technical/mental ones (technique, temperament, accuracy) which age well.
+  PHYSICAL_DECLINE_MULT: 1.5,
+  TECHNICAL_DECLINE_MULT: 0.4,
+
+  // Playing time: regulars develop, fringe players stagnate and rust.
+  APPEARANCES_FOR_FULL_GROWTH: 8, // out of a 14-game league season
+  REGULAR_APPEARANCES: 5,         // at/above this, no rust penalty to decline
+  BENCH_GROWTH_MULT: 0.35,        // growth floor for players who barely featured
+  BENCH_DECLINE_MULT: 1.2,        // extra decline for fringe players
+
+  // A standout season accelerates growth (up to +PERFORMANCE_BONUS_MAX).
+  PERFORMANCE_BONUS_MAX: 0.5,
+
+  // Per-player, per-season luck: +/- this fraction (breakout years / setbacks).
+  RANDOM_VARIATION: 0.2,
+};
+
 // Helper to check if it's a mega auction year
 export function isMegaAuctionYear(season: number): boolean {
   return season === 1 || (season > 1 && (season - 1) % SEASON_CONFIG.MEGA_AUCTION_FREQUENCY === 0);

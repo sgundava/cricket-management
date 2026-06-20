@@ -34,6 +34,7 @@ import {
   CareerMilestone,
   TrophyRecord,
 } from '../types';
+import { developAllPlayers, SeasonAppearance } from '../engine/playerDevelopment';
 import {
   getSaveSlots,
   saveGame as saveGameToSlot,
@@ -124,6 +125,7 @@ interface GameStore extends GameState, UIState {
 
   // Multi-season progression
   startNextSeason: () => void;
+  continueToAuctionPhase: () => void;
   processSeasonEnd: () => void;
   releasePlayer: (playerId: string) => void;
   confirmReleases: () => void;
@@ -1207,7 +1209,7 @@ export const useGameStore = create<GameStore>()(
       },
 
       processSeasonEnd: () => {
-        const { players, teams, playerTeamId, getSeasonResult, manager, updateManagerReputation, checkNationalTeamOffer, league, season } = get();
+        const { players, teams, fixtures, playerTeamId, getSeasonResult, manager, updateManagerReputation, checkNationalTeamOffer, league, season } = get();
         const result = getSeasonResult();
 
         // Update manager history
@@ -1245,10 +1247,57 @@ export const useGameStore = create<GameStore>()(
           domestic: Math.max(0, Math.min(100, manager.reputation.domestic + reputationChange)),
         };
 
-        // Age all players (+1 year) and decrement contracts (-1 year)
-        const updatedPlayers = players.map((player) => ({
+        // Aggregate this season's per-player appearances/output from completed
+        // fixtures (still intact here — regenerated later in resetForNewSeason).
+        // This feeds the development engine's playing-time & performance inputs.
+        const appearances = new Map<string, SeasonAppearance>();
+        const seenInMatch = new Map<string, Set<string>>();
+        const recordContribution = (
+          playerId: string,
+          matchId: string,
+          runs: number,
+          wickets: number
+        ) => {
+          const entry = appearances.get(playerId) || { appearances: 0, runs: 0, wickets: 0 };
+          entry.runs += runs;
+          entry.wickets += wickets;
+          let matches = seenInMatch.get(playerId);
+          if (!matches) {
+            matches = new Set();
+            seenInMatch.set(playerId, matches);
+          }
+          if (!matches.has(matchId)) {
+            matches.add(matchId);
+            entry.appearances += 1;
+          }
+          appearances.set(playerId, entry);
+        };
+
+        fixtures
+          .filter((m) => m.status === 'completed')
+          .forEach((m) => {
+            [m.innings1, m.innings2, m.innings3, m.innings4].forEach((inn) => {
+              if (!inn) return;
+              const batEntries = inn.batterStats instanceof Map
+                ? Array.from(inn.batterStats.entries())
+                : Object.entries(inn.batterStats || {});
+              batEntries.forEach(([pid, s]) => {
+                recordContribution(pid, m.id, (s as { runs?: number }).runs || 0, 0);
+              });
+              const bowlEntries = inn.bowlerStats instanceof Map
+                ? Array.from(inn.bowlerStats.entries())
+                : Object.entries(inn.bowlerStats || {});
+              bowlEntries.forEach(([pid, s]) => {
+                recordContribution(pid, m.id, 0, (s as { wickets?: number }).wickets || 0);
+              });
+            });
+          });
+
+        // Develop every player one season (ages +1, shifts skills), then apply
+        // contract decrement and dynamic-state resets on top.
+        const { players: developedPlayers, reports } = developAllPlayers(players, appearances);
+        const updatedPlayers = developedPlayers.map((player) => ({
           ...player,
-          age: player.age + 1,
           contract: {
             ...player.contract,
             yearsRemaining: Math.max(0, player.contract.yearsRemaining - 1),
@@ -1282,6 +1331,7 @@ export const useGameStore = create<GameStore>()(
           phase: 'off-season',
           releasedPlayers: expiredContractPlayers,
           unsoldPlayers: [...get().unsoldPlayers, ...freeAgents],
+          lastDevelopmentReport: reports,
         });
 
         // Check for national team offer after updating state
@@ -1289,23 +1339,27 @@ export const useGameStore = create<GameStore>()(
       },
 
       startNextSeason: () => {
-        const { season, processSeasonEnd, isMegaAuctionYear, navigateTo } = get();
+        const { season, processSeasonEnd, navigateTo } = get();
 
-        // Process end-of-season updates (aging, contracts, stats)
+        // Process end-of-season updates (aging, player development, contracts)
         processSeasonEnd();
 
-        const nextSeason = season + 1;
-        const isMega = isMegaAuctionYear(nextSeason);
+        // Advance the season counter, then show the development report. The
+        // report screen drives the player on to the auction via
+        // continueToAuctionPhase().
+        set({ season: season + 1 });
+        navigateTo('development-report');
+      },
 
-        set({ season: nextSeason });
+      continueToAuctionPhase: () => {
+        const { season, isMegaAuctionYear, navigateTo } = get();
 
-        if (isMega) {
-          // Mega auction year - go straight to retention phase
-          // TODO: Navigate to retention phase when auction screen handles this
+        if (isMegaAuctionYear(season)) {
+          // Mega auction year - auction screen detects phase === 'off-season'
+          // and shows the retention phase.
           navigateTo('auction');
-          // The auction screen should detect phase === 'off-season' and show retention
         } else {
-          // Mini auction year - go to release phase first
+          // Mini auction year - go to release phase first.
           navigateTo('release-phase');
         }
       },
@@ -3037,6 +3091,7 @@ export const useGameStore = create<GameStore>()(
         unsoldPlayers: state.unsoldPlayers,
         pendingNationalTeamOffer: state.pendingNationalTeamOffer,
         careerMilestones: state.careerMilestones,
+        lastDevelopmentReport: state.lastDevelopmentReport,
         auctionState: state.auctionState,
         liveMatchState: state.liveMatchState,
       }),

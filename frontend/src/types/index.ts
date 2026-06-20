@@ -540,6 +540,29 @@ export type CareerMilestone =
   | 'test_series_abroad'  // Won Test series away from home
   | 'grand_slam';         // Won all formats in a year
 
+// ============================================
+// PLAYER DEVELOPMENT TYPES
+// ============================================
+
+export type DevelopmentBand = 'youth' | 'prime' | 'decline' | 'veteran';
+
+export interface SkillChange {
+  category: 'batting' | 'bowling' | 'fielding';
+  skill: string;      // e.g. 'power', 'accuracy'
+  before: number;
+  after: number;
+}
+
+export interface PlayerDevelopmentResult {
+  playerId: string;
+  ageAfter: number;
+  band: DevelopmentBand;
+  overallBefore: number;
+  overallAfter: number;
+  delta: number;          // overallAfter - overallBefore (can be negative)
+  changes: SkillChange[]; // individual skill movements, largest-magnitude first
+}
+
 export interface GameState {
   // Meta
   initialized: boolean;
@@ -583,6 +606,9 @@ export interface GameState {
   // Career Progression
   pendingNationalTeamOffer?: NationalTeamOffer;  // Offer waiting for response
   careerMilestones: CareerMilestone[];           // Achieved milestones
+
+  // Most recent end-of-season player development outcomes (for the report screen)
+  lastDevelopmentReport?: PlayerDevelopmentResult[];
 }
 
 // ============================================
@@ -733,6 +759,7 @@ export type Screen =
   | 'match-result'
   | 'event'
   | 'season-summary'
+  | 'development-report'
   | 'auction'
   | 'release-phase';
 

@@ -10,6 +10,7 @@ export { ClubScreen } from './ClubScreen';
 export { MatchPrepScreen } from './MatchPrepScreen';
 export { MatchLiveScreen } from './MatchLiveScreen';
 export { SeasonSummaryScreen } from './SeasonSummaryScreen';
+export { DevelopmentReportScreen } from './DevelopmentReportScreen';
 export { EventScreen } from './EventScreen';
 export { AuctionScreen } from './AuctionScreen';
 export { ReleasePhaseScreen } from './ReleasePhaseScreen';
