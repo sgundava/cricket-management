@@ -93,6 +93,18 @@ export interface FieldingSkills {
   athleticism: number;  // 0-100: Range, diving, speed
 }
 
+// Manager-assigned training plan (drives season-end development bias)
+export type TrainingFocus =
+  | 'balanced'
+  | 'power-hitting'
+  | 'batting-technique'
+  | 'pace-bowling'
+  | 'bowling-craft'
+  | 'fielding'
+  | 'fitness';
+
+export type TrainingIntensity = 'light' | 'normal' | 'intensive';
+
 export interface Personality {
   temperament: 'fiery' | 'calm' | 'moody';
   professionalism: number;  // 0-100
@@ -155,6 +167,10 @@ export interface Player {
 
   personality: Personality;
   contract: Contract;
+
+  // Manager-assigned development plan (undefined = balanced / no special focus)
+  trainingFocus?: TrainingFocus;
+  trainingIntensity?: TrainingIntensity;
 
   // Track when player was last talked to (for cooldown)
   lastTalkedMatchDay?: number;
@@ -760,6 +776,7 @@ export type Screen =
   | 'event'
   | 'season-summary'
   | 'development-report'
+  | 'training'
   | 'auction'
   | 'release-phase';
 

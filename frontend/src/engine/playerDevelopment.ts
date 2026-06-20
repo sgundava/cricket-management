@@ -4,7 +4,7 @@ import {
   SkillChange,
   DevelopmentBand,
 } from '../types';
-import { DEVELOPMENT_CONFIG as DC } from '../config/gameConfig';
+import { DEVELOPMENT_CONFIG as DC, TRAINING_CONFIG as TC } from '../config/gameConfig';
 
 // ============================================
 // PLAYER DEVELOPMENT ENGINE
@@ -124,6 +124,14 @@ export const developPlayer = (
   // One luck roll per player per season so a "breakout" lifts everything together.
   const luck = 1 + (Math.random() * 2 - 1) * DC.RANDOM_VARIATION;
 
+  // Manager-assigned training plan: boost growth / slow decline on targeted skills.
+  const focus =
+    player.trainingFocus && player.trainingFocus !== 'balanced' ? player.trainingFocus : null;
+  const intensity = TC.INTENSITY[player.trainingIntensity || 'normal'];
+  const trainedSkills = new Set<string>(
+    focus ? (TC.FOCUS_SKILLS[focus] || []).map((s) => `${s.category}.${s.key}`) : []
+  );
+
   const batting = { ...player.batting };
   const bowling = { ...player.bowling };
   const fielding = { ...player.fielding };
@@ -134,17 +142,20 @@ export const developPlayer = (
   for (const def of SKILL_DEFS) {
     const cur = buckets[def.category][def.key];
     const cap = player.potential[def.category];
+    const isTrained = trainedSkills.has(`${def.category}.${def.key}`);
     let next = cur;
 
     if (band === 'youth' || band === 'prime') {
       const headroom = Math.max(0, cap - cur);
       const rate = band === 'youth' ? DC.GROWTH.youth : DC.GROWTH.prime;
-      const gain = headroom * rate * growthPlayMult * perfMult * luck;
+      let gain = headroom * rate * growthPlayMult * perfMult * luck;
+      if (isTrained) gain *= 1 + TC.FOCUS_GROWTH_BONUS * intensity.growthScale;
       next = Math.min(cur + gain, cap); // never overshoot potential
     } else {
       const base = band === 'decline' ? DC.DECLINE.decline : DC.DECLINE.veteran;
       const kindMult = def.kind === 'physical' ? DC.PHYSICAL_DECLINE_MULT : DC.TECHNICAL_DECLINE_MULT;
-      const loss = base * kindMult * declinePlayMult * luck;
+      let loss = base * kindMult * declinePlayMult * luck;
+      if (isTrained) loss *= 1 - intensity.declineMitigation;
       next = cur - loss;
     }
 

@@ -1,6 +1,16 @@
 import { useMemo } from 'react';
 import { useGameStore } from '../store/gameStore';
-import { PlayerDevelopmentResult, DevelopmentBand, SkillChange } from '../types';
+import { PlayerDevelopmentResult, DevelopmentBand, SkillChange, TrainingFocus } from '../types';
+
+const FOCUS_LABELS: Record<TrainingFocus, string> = {
+  'balanced': 'Balanced',
+  'power-hitting': 'Power Hitting',
+  'batting-technique': 'Batting Technique',
+  'pace-bowling': 'Pace Bowling',
+  'bowling-craft': 'Bowling Craft',
+  'fielding': 'Fielding',
+  'fitness': 'Fitness',
+};
 
 const BAND_META: Record<DevelopmentBand, { label: string; emoji: string; color: string }> = {
   youth: { label: 'Developing', emoji: '🌱', color: 'text-green-400' },
@@ -91,12 +101,17 @@ export const DevelopmentReportScreen = () => {
         className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg bg-gray-700/30"
       >
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <span className="text-sm font-medium truncate">{player.shortName}</span>
             <span className="text-[10px] text-gray-500">
               {band.emoji} {r.ageAfter}y
             </span>
             {team && <span className="text-[10px] text-gray-600">{team.shortName}</span>}
+            {player.trainingFocus && player.trainingFocus !== 'balanced' && (
+              <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-teal-900/40 border border-teal-800/50 text-teal-300">
+                {FOCUS_LABELS[player.trainingFocus]}
+              </span>
+            )}
           </div>
           {topChanges.length > 0 && (
             <div className="flex flex-wrap gap-1 mt-1">

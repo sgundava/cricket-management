@@ -11,6 +11,7 @@ export { MatchPrepScreen } from './MatchPrepScreen';
 export { MatchLiveScreen } from './MatchLiveScreen';
 export { SeasonSummaryScreen } from './SeasonSummaryScreen';
 export { DevelopmentReportScreen } from './DevelopmentReportScreen';
+export { TrainingScreen } from './TrainingScreen';
 export { EventScreen } from './EventScreen';
 export { AuctionScreen } from './AuctionScreen';
 export { ReleasePhaseScreen } from './ReleasePhaseScreen';

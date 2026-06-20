@@ -425,8 +425,20 @@ export const ClubScreen = () => {
         </div>
 
         {/* Team Actions - full width */}
-        <div className="md:col-span-2 bg-gray-800 rounded-xl p-4 border border-gray-700">
+        <div className="md:col-span-2 bg-gray-800 rounded-xl p-4 border border-gray-700 space-y-3">
           <h2 className="text-sm font-semibold text-gray-400 mb-3">TEAM ACTIONS</h2>
+
+          <button
+            onClick={() => navigateTo('training')}
+            className="w-full p-4 rounded-lg flex items-center gap-3 transition-colors bg-teal-900/30 hover:bg-teal-900/50 border border-teal-700"
+          >
+            <span className="text-2xl">🏋️</span>
+            <div className="text-left flex-1">
+              <div className="font-medium">Training Centre</div>
+              <div className="text-xs text-gray-400">Set each player's development focus</div>
+            </div>
+            <span className="text-teal-400">→</span>
+          </button>
 
           <button
             onClick={() => navigateTo('team-meeting')}

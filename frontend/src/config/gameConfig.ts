@@ -133,6 +133,61 @@ export const DEVELOPMENT_CONFIG = {
   RANDOM_VARIATION: 0.2,
 };
 
+// ============================================
+// TRAINING (manager-assigned development plan)
+// ============================================
+// A training focus biases season-end development toward a set of skills:
+// faster growth when there's headroom, and slower decline for veterans.
+// Intensity scales the effect and carries a readiness (fitness) cost.
+export const TRAINING_CONFIG = {
+  // Skills boosted by each focus, by category. 'balanced' targets nothing.
+  FOCUS_SKILLS: {
+    'balanced': [],
+    'power-hitting': [
+      { category: 'batting', key: 'power' },
+      { category: 'batting', key: 'timing' },
+    ],
+    'batting-technique': [
+      { category: 'batting', key: 'technique' },
+      { category: 'batting', key: 'temperament' },
+    ],
+    'pace-bowling': [
+      { category: 'bowling', key: 'speed' },
+      { category: 'bowling', key: 'stamina' },
+    ],
+    'bowling-craft': [
+      { category: 'bowling', key: 'accuracy' },
+      { category: 'bowling', key: 'variation' },
+    ],
+    'fielding': [
+      { category: 'fielding', key: 'catching' },
+      { category: 'fielding', key: 'ground' },
+      { category: 'fielding', key: 'throwing' },
+      { category: 'fielding', key: 'athleticism' },
+    ],
+    // Conditioning: slows physical decline across the board (great for veterans).
+    'fitness': [
+      { category: 'batting', key: 'power' },
+      { category: 'bowling', key: 'speed' },
+      { category: 'bowling', key: 'stamina' },
+      { category: 'fielding', key: 'ground' },
+      { category: 'fielding', key: 'throwing' },
+      { category: 'fielding', key: 'athleticism' },
+    ],
+  } as Record<string, { category: 'batting' | 'bowling' | 'fielding'; key: string }[]>,
+
+  // Extra growth on targeted skills at normal intensity (scaled by intensity).
+  FOCUS_GROWTH_BONUS: 0.5,
+
+  // Intensity table: growth scaling, decline mitigation on targeted skills,
+  // and the fitness adjustment applied to the player's season-start reset.
+  INTENSITY: {
+    light: { growthScale: 0.6, declineMitigation: 0.05, fitnessAdjust: 5 },
+    normal: { growthScale: 1.0, declineMitigation: 0.15, fitnessAdjust: 0 },
+    intensive: { growthScale: 1.6, declineMitigation: 0.3, fitnessAdjust: -8 },
+  } as Record<string, { growthScale: number; declineMitigation: number; fitnessAdjust: number }>,
+};
+
 // Helper to check if it's a mega auction year
 export function isMegaAuctionYear(season: number): boolean {
   return season === 1 || (season > 1 && (season - 1) % SEASON_CONFIG.MEGA_AUCTION_FREQUENCY === 0);

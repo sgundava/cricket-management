@@ -19,6 +19,7 @@ import {
   MatchLiveScreen,
   SeasonSummaryScreen,
   DevelopmentReportScreen,
+  TrainingScreen,
   EventScreen,
   AuctionScreen,
   ReleasePhaseScreen,
@@ -77,7 +78,7 @@ function App() {
   }
 
   // Screens that should hide the nav bar
-  const hideNavScreens = ['match-live', 'match-prep', 'event', 'season-summary', 'development-report', 'player-talk', 'team-meeting', 'auction', 'release-phase'];
+  const hideNavScreens = ['match-live', 'match-prep', 'event', 'season-summary', 'development-report', 'training', 'player-talk', 'team-meeting', 'auction', 'release-phase'];
   const showNav = !hideNavScreens.includes(currentScreen);
 
   // Render current screen
@@ -107,6 +108,8 @@ function App() {
         return <SeasonSummaryScreen />;
       case 'development-report':
         return <DevelopmentReportScreen />;
+      case 'training':
+        return <TrainingScreen />;
       case 'event':
         return <EventScreen />;
       case 'auction':

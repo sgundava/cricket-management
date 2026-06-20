@@ -33,8 +33,11 @@ import {
   NationalTeamOffer,
   CareerMilestone,
   TrophyRecord,
+  TrainingFocus,
+  TrainingIntensity,
 } from '../types';
 import { developAllPlayers, SeasonAppearance } from '../engine/playerDevelopment';
+import { TRAINING_CONFIG } from '../config/gameConfig';
 import {
   getSaveSlots,
   saveGame as saveGameToSlot,
@@ -105,6 +108,7 @@ interface GameStore extends GameState, UIState {
   // Player management
   updatePlayer: (playerId: string, updates: Partial<Player>) => void;
   updatePlayerState: (playerId: string, updates: Partial<Pick<Player, 'form' | 'fitness' | 'morale' | 'fatigue'>>) => void;
+  setPlayerTraining: (playerId: string, focus: TrainingFocus, intensity: TrainingIntensity) => void;
 
   // Team management
   updateTeam: (teamId: string, updates: Partial<Team>) => void;
@@ -463,6 +467,14 @@ export const useGameStore = create<GameStore>()(
               fatigue: Math.max(0, Math.min(100, updates.fatigue ?? p.fatigue)),
             };
           }),
+        }));
+      },
+
+      setPlayerTraining: (playerId, focus, intensity) => {
+        set((state) => ({
+          players: state.players.map((p) =>
+            p.id === playerId ? { ...p, trainingFocus: focus, trainingIntensity: intensity } : p
+          ),
         }));
       },
 
@@ -1296,19 +1308,27 @@ export const useGameStore = create<GameStore>()(
         // Develop every player one season (ages +1, shifts skills), then apply
         // contract decrement and dynamic-state resets on top.
         const { players: developedPlayers, reports } = developAllPlayers(players, appearances);
-        const updatedPlayers = developedPlayers.map((player) => ({
-          ...player,
-          contract: {
-            ...player.contract,
-            yearsRemaining: Math.max(0, player.contract.yearsRemaining - 1),
-          },
-          // Apply partial stat carryover
-          form: Math.round(player.form * 0.3), // 30% form carries over
-          fitness: 70 + Math.floor(Math.random() * 10), // Reset with variation
-          morale: 60 + Math.floor(Math.random() * 10),
-          fatigue: 0,
-          lastTalkedMatchDay: 0,
-        }));
+        const updatedPlayers = developedPlayers.map((player) => {
+          // Intensive training leaves a player more worn going into the new
+          // season; light training keeps them fresher. Only applies with a focus.
+          const trainedFitnessAdjust =
+            player.trainingFocus && player.trainingFocus !== 'balanced'
+              ? TRAINING_CONFIG.INTENSITY[player.trainingIntensity || 'normal'].fitnessAdjust
+              : 0;
+          return {
+            ...player,
+            contract: {
+              ...player.contract,
+              yearsRemaining: Math.max(0, player.contract.yearsRemaining - 1),
+            },
+            // Apply partial stat carryover
+            form: Math.round(player.form * 0.3), // 30% form carries over
+            fitness: Math.max(40, Math.min(100, 70 + Math.floor(Math.random() * 10) + trainedFitnessAdjust)),
+            morale: 60 + Math.floor(Math.random() * 10),
+            fatigue: 0,
+            lastTalkedMatchDay: 0,
+          };
+        });
 
         // Find players with expired contracts (yearsRemaining was 1, now 0)
         const expiredContractPlayers = players
@@ -1387,10 +1407,16 @@ export const useGameStore = create<GameStore>()(
           squad: team.squad.filter((id) => !allReleasedPlayers.includes(id)),
         }));
 
-        // Update player contracts for released players
+        // Update player contracts for released players; clear any training plan
+        // so it doesn't follow them onto a new team.
         const updatedPlayers = players.map((player) =>
           allReleasedPlayers.includes(player.id)
-            ? { ...player, contract: { ...player.contract, yearsRemaining: 0 } }
+            ? {
+                ...player,
+                contract: { ...player.contract, yearsRemaining: 0 },
+                trainingFocus: undefined,
+                trainingIntensity: undefined,
+              }
             : player
         );
 
